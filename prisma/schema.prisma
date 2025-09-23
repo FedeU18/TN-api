@@ -1,0 +1,116 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+model TipoUbicacion {
+  id_tipo_ubicacion Int        @id @default(autoincrement())
+  nombre            String
+  ubicaciones       Ubicacion[]
+}
+
+model Ubicacion {
+  id_ubicacion       Int           @id @default(autoincrement())
+  nombre             String
+  tipoUbicacion      TipoUbicacion @relation(fields: [id_tipo_ubicacion], references: [id_tipo_ubicacion])
+  id_tipo_ubicacion  Int
+  usuarios           Usuario[]
+  repartidores       Repartidor[]
+}
+
+model EstadoPedido {
+  id_estado_pedido Int      @id @default(autoincrement())
+  nombre           String
+  pedidos          Pedido[]
+}
+
+model Usuario {
+  id_usuario       Int        @id @default(autoincrement())
+  nombre           String
+  telefono         String
+  correo           String     @unique
+  direccion        String
+  coordenadas      String
+  ubicacion        Ubicacion  @relation(fields: [id_ubicacion], references: [id_ubicacion])
+  id_ubicacion     Int
+  pedidos          Pedido[]
+  calificaciones   Calificacion[]
+  password         String     
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+}
+
+model Repartidor {
+  id_repartidor     Int        @id @default(autoincrement())
+  nombre            String
+  telefono          String
+  correo            String     @unique
+  direccion         String
+  coordenadas       String
+  ubicacion         Ubicacion  @relation(fields: [id_ubicacion], references: [id_ubicacion])
+  id_ubicacion      Int
+  pedidos           Pedido[]
+  calificaciones    Calificacion[]
+}
+
+model Pedido {
+  id_pedido            Int           @id @default(autoincrement())
+  usuario              Usuario       @relation(fields: [id_usuario], references: [id_usuario])
+  id_usuario           Int
+  estadoPedido         EstadoPedido  @relation(fields: [id_estado_pedido], references: [id_estado_pedido])
+  id_estado_pedido     Int
+  fecha_hora           DateTime
+  fecha_hora_entrega   DateTime
+  repartidor           Repartidor    @relation(fields: [id_repartidor], references: [id_repartidor])
+  id_repartidor        Int
+  productos            PedidoProducto[]
+  calificaciones       Calificacion[]
+}
+
+model TipoProducto {
+  id_tipo_producto Int       @id @default(autoincrement())
+  nombre           String
+  productos        Producto[]
+}
+
+model Producto {
+  id_producto       Int           @id @default(autoincrement())
+  nombre            String
+  descripcion       String
+  precio            Float
+  tipoProducto      TipoProducto  @relation(fields: [id_tipo_producto], references: [id_tipo_producto])
+  id_tipo_producto  Int
+  pedidos           PedidoProducto[]
+}
+
+model PedidoProducto {
+  id_pedido_producto Int      @id @default(autoincrement())
+  pedido             Pedido   @relation(fields: [id_pedido], references: [id_pedido])
+  id_pedido          Int
+  producto           Producto @relation(fields: [id_producto], references: [id_producto])
+  id_producto        Int
+  cantidad           Int
+}
+
+model Calificacion {
+  id_calificacion        Int        @id @default(autoincrement())
+  pedido                 Pedido     @relation(fields: [id_pedido], references: [id_pedido])
+  id_pedido              Int
+  usuario                Usuario    @relation(fields: [id_usuario], references: [id_usuario])
+  id_usuario             Int
+  repartidor             Repartidor @relation(fields: [id_repartidor], references: [id_repartidor])
+  id_repartidor          Int
+  calificacion_usuario   Int
+  calificacion_repartidor Int
+  comentario_usuario     String
+  comentario_repartidor  String
+}
