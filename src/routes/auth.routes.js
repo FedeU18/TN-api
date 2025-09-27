@@ -2,8 +2,9 @@
 import { Router } from "express";
 import {
   login,
-  forgotPassword,
-  resetPassword,
+  // forgotPassword,
+  // resetPassword,
+  registro,
 } from "../controllers/auth.controller.js";
 
 const router = Router();
@@ -12,8 +13,9 @@ router.get("/", (req, res) => {
   res.send("Auth route is working");
 });
 
+router.post("/registro", registro);
 router.post("/login", login);
-router.post("/forgot-password", forgotPassword);
-router.post("/reset-password", resetPassword);
+// router.post("/forgot-password", forgotPassword);
+// router.post("/reset-password", resetPassword);
 
 export default router;

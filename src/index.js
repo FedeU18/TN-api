@@ -4,8 +4,6 @@ import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.routes.js";
 import errorHandler from "./middlewares/errorHandler.js";
-import healthRoutes from "./routes/prueba.routes.js";
-
 dotenv.config();
 
 const app = express();
@@ -17,7 +15,6 @@ app.use(express.json());
 
 // Rutas
 app.use("/api/auth", authRoutes);
-app.use("/api/health", healthRoutes);
 // Manejo de errores
 app.use(errorHandler);
 

@@ -12,105 +12,100 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-model TipoUbicacion {
-  id_tipo_ubicacion Int        @id @default(autoincrement())
-  nombre            String
-  ubicaciones       Ubicacion[]
-}
 
-model Ubicacion {
-  id_ubicacion       Int           @id @default(autoincrement())
-  nombre             String
-  tipoUbicacion      TipoUbicacion @relation(fields: [id_tipo_ubicacion], references: [id_tipo_ubicacion])
-  id_tipo_ubicacion  Int
-  usuarios           Usuario[]
-  repartidores       Repartidor[]
+
+model Usuario {
+  id_usuario      Int            @id @default(autoincrement())
+  nombre          String
+  apellido        String
+  email           String       @unique
+  password        String
+  telefono        Int
+  foto_perfil     String?        // puede ser NULL
+  fecha_registro  DateTime       @default(now())
+  estado_sesion   Boolean        @default(false)
+  rol             String
+  pedidosCliente  Pedido[]       @relation("ClientePedidos")
+  pedidosRepartidor Pedido[]     @relation("RepartidorPedidos")
+  notificaciones  Notificacion[]
+  calificacionesCliente Calificacion[] @relation("ClienteCalificaciones")
+  calificacionesRepartidor Calificacion[] @relation("RepartidorCalificaciones")
 }
 
 model EstadoPedido {
-  id_estado_pedido Int      @id @default(autoincrement())
-  nombre           String
-  pedidos          Pedido[]
-}
+  id_estado     Int       @id @default(autoincrement())
+  nombre_estado String
 
-model Usuario {
-  id_usuario       Int        @id @default(autoincrement())
-  nombre           String
-  telefono         String
-  correo           String     @unique
-  direccion        String
-  coordenadas      String
-  ubicacion        Ubicacion  @relation(fields: [id_ubicacion], references: [id_ubicacion])
-  id_ubicacion     Int
-  pedidos          Pedido[]
-  calificaciones   Calificacion[]
-  password         String     
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-}
-
-model Repartidor {
-  id_repartidor     Int        @id @default(autoincrement())
-  nombre            String
-  telefono          String
-  correo            String     @unique
-  direccion         String
-  coordenadas       String
-  ubicacion         Ubicacion  @relation(fields: [id_ubicacion], references: [id_ubicacion])
-  id_ubicacion      Int
-  pedidos           Pedido[]
-  calificaciones    Calificacion[]
+  pedidos       Pedido[]
 }
 
 model Pedido {
-  id_pedido            Int           @id @default(autoincrement())
-  usuario              Usuario       @relation(fields: [id_usuario], references: [id_usuario])
-  id_usuario           Int
-  estadoPedido         EstadoPedido  @relation(fields: [id_estado_pedido], references: [id_estado_pedido])
-  id_estado_pedido     Int
-  fecha_hora           DateTime
-  fecha_hora_entrega   DateTime
-  repartidor           Repartidor    @relation(fields: [id_repartidor], references: [id_repartidor])
-  id_repartidor        Int
-  productos            PedidoProducto[]
-  calificaciones       Calificacion[]
+  id_pedido      Int           @id @default(autoincrement())
+  id_cliente     Int
+  id_repartidor  Int?
+  direccion_origen  String
+  direccion_destino String
+  id_estado      Int
+  fecha_creacion DateTime      @default(now())
+  fecha_entrega  DateTime?
+  qr_codigo      String
+
+  cliente        Usuario       @relation("ClientePedidos", fields: [id_cliente], references: [id_usuario])
+  repartidor     Usuario?      @relation("RepartidorPedidos", fields: [id_repartidor], references: [id_usuario])
+  estado         EstadoPedido  @relation(fields: [id_estado], references: [id_estado])
+  ubicaciones    Ubicacion[]
+  calificacion   Calificacion?
+  notificaciones Notificacion[]
 }
 
-model TipoProducto {
-  id_tipo_producto Int       @id @default(autoincrement())
-  nombre           String
-  productos        Producto[]
+model TipoUbicacion {
+  id_estado     Int       @id @default(autoincrement())
+  nombre_estado String
+
+  ubicaciones   Ubicacion[]
 }
 
-model Producto {
-  id_producto       Int           @id @default(autoincrement())
-  nombre            String
-  descripcion       String
-  precio            Float
-  tipoProducto      TipoProducto  @relation(fields: [id_tipo_producto], references: [id_tipo_producto])
-  id_tipo_producto  Int
-  pedidos           PedidoProducto[]
-}
+model Ubicacion {
+  id_ubicacion Int       @id @default(autoincrement())
+  id_pedido    Int
+  id_tipo      Int
+  latitud      Decimal
+  longitud     Decimal
 
-model PedidoProducto {
-  id_pedido_producto Int      @id @default(autoincrement())
-  pedido             Pedido   @relation(fields: [id_pedido], references: [id_pedido])
-  id_pedido          Int
-  producto           Producto @relation(fields: [id_producto], references: [id_producto])
-  id_producto        Int
-  cantidad           Int
+  pedido       Pedido     @relation(fields: [id_pedido], references: [id_pedido])
+  tipo         TipoUbicacion @relation(fields: [id_tipo], references: [id_estado])
 }
 
 model Calificacion {
-  id_calificacion        Int        @id @default(autoincrement())
-  pedido                 Pedido     @relation(fields: [id_pedido], references: [id_pedido])
-  id_pedido              Int
-  usuario                Usuario    @relation(fields: [id_usuario], references: [id_usuario])
-  id_usuario             Int
-  repartidor             Repartidor @relation(fields: [id_repartidor], references: [id_repartidor])
-  id_repartidor          Int
-  calificacion_usuario   Int
-  calificacion_repartidor Int
-  comentario_usuario     String
-  comentario_repartidor  String
+  id_calificacion Int      @id @default(autoincrement())
+  id_pedido       Int      @unique   // 👈 clave única para relación 1–1
+  id_cliente      Int
+  id_repartidor   Int
+  puntuacion      Int
+  comentario      String
+  fecha           DateTime @default(now())
+
+  pedido     Pedido  @relation(fields: [id_pedido], references: [id_pedido])
+  cliente    Usuario @relation("ClienteCalificaciones", fields: [id_cliente], references: [id_usuario])
+  repartidor Usuario @relation("RepartidorCalificaciones", fields: [id_repartidor], references: [id_usuario])
+}
+
+model TipoNotificacion {
+  id_tipo     Int    @id @default(autoincrement())
+  nombre_tipo String
+
+  notificaciones Notificacion[]
+}
+
+model Notificacion {
+  id_notificacion Int      @id @default(autoincrement())
+  id_pedido       Int
+  id_usuario      Int
+  mensaje         String
+  id_tipo         Int
+  fecha_envio     DateTime @default(now())
+
+  pedido          Pedido   @relation(fields: [id_pedido], references: [id_pedido])
+  usuario         Usuario  @relation(fields: [id_usuario], references: [id_usuario])
+  tipo            TipoNotificacion @relation(fields: [id_tipo], references: [id_tipo])
 }
