@@ -20,7 +20,7 @@ model Usuario {
   apellido        String
   email           String    @unique
   password        String
-  telefono        Int
+  telefono        String
   foto_perfil     String?
   fecha_registro  DateTime  @default(now())
   estado_sesion   Boolean   @default(false)
