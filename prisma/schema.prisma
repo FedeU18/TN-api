@@ -15,22 +15,28 @@ datasource db {
 
 
 model Usuario {
-  id_usuario      Int            @id @default(autoincrement())
+  id_usuario      Int       @id @default(autoincrement())
   nombre          String
   apellido        String
-  email           String       @unique
+  email           String    @unique
   password        String
   telefono        Int
-  foto_perfil     String?        // puede ser NULL
-  fecha_registro  DateTime       @default(now())
-  estado_sesion   Boolean        @default(false)
+  foto_perfil     String?
+  fecha_registro  DateTime  @default(now())
+  estado_sesion   Boolean   @default(false)
   rol             String
+
+  // Campos para reset password
+  resetPasswordToken   String?
+  resetPasswordExpires DateTime?
+
   pedidosCliente  Pedido[]       @relation("ClientePedidos")
   pedidosRepartidor Pedido[]     @relation("RepartidorPedidos")
   notificaciones  Notificacion[]
   calificacionesCliente Calificacion[] @relation("ClienteCalificaciones")
   calificacionesRepartidor Calificacion[] @relation("RepartidorCalificaciones")
 }
+
 
 model EstadoPedido {
   id_estado     Int       @id @default(autoincrement())
