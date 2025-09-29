@@ -102,7 +102,8 @@ export const forgotPassword = async (req, res) => {
     //Generar token seguro
     const resetToken = jwt.sign(
       { id: user.id_usuario, email: user.email },
-      process.env.JWT_SECRET
+      process.env.JWT_SECRET,
+      { expiresIn: "15m" }
     );
     //expira en 15 minutos
     const resetTokenExpires = new Date(Date.now() + 1000 * 60 * 15);
@@ -148,5 +149,59 @@ export const forgotPassword = async (req, res) => {
 };
 
 export const resetPassword = async (req, res) => {
-  res.status(501).json({ message: "Función no implementada" });
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res
+        .status(400)
+        .json({ message: "Token y nueva contraseña son requeridos" });
+    }
+
+    //verifico token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ message: "Token inválido o expirado" });
+    }
+
+    //busco usuario por id y comparar el token guardado en BD
+    const user = await prisma.usuario.findUnique({
+      where: { id_usuario: decoded.id },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    //valido que el token almacenado coincida
+    if (
+      user.resetPasswordToken !== token ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < new Date()
+    ) {
+      return res.status(400).json({ message: "Token inválido o expirado" });
+    }
+
+    //hashear la nueva contraseña
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    //actualizar usuario y limpiar token
+    await prisma.usuario.update({
+      where: { id_usuario: user.id_usuario },
+      data: {
+        password: hashedPassword,
+        resetPasswordToken: null,
+        resetPasswordExpires: null,
+      },
+    });
+
+    return res
+      .status(200)
+      .json({ message: "Contraseña reseteada exitosamente" });
+  } catch (error) {
+    console.error("Error en resetPassword:", error);
+    return res.status(500).json({ message: "Error al resetear contraseña" });
+  }
 };
