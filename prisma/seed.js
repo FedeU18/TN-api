@@ -1,9 +1,14 @@
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log("🌱 Iniciando seed...");
+
+  // Hashear contraseñas
+  const hashedPassword = await bcrypt.hash("password!123", 10);
+  const hashedAdminPassword = await bcrypt.hash("admin!123", 10);
 
   // 1. Usuarios
   const cliente1 = await prisma.usuario.create({
@@ -11,7 +16,7 @@ async function main() {
       nombre: "Ana",
       apellido: "Gómez",
       email: "ana@example.com",
-      password: "password123",
+      password: hashedPassword,
       telefono: "2994001111",
       rol: "cliente",
     },
@@ -22,7 +27,7 @@ async function main() {
       nombre: "Luis",
       apellido: "Fernández",
       email: "luis@example.com",
-      password: "password123",
+      password: hashedPassword,
       telefono: "2994002222",
       rol: "cliente",
     },
@@ -33,7 +38,7 @@ async function main() {
       nombre: "María",
       apellido: "Pérez",
       email: "maria@example.com",
-      password: "password123",
+      password: hashedPassword,
       telefono: "2994111111",
       rol: "repartidor",
     },
@@ -44,9 +49,20 @@ async function main() {
       nombre: "Jorge",
       apellido: "Sosa",
       email: "jorge@example.com",
-      password: "password123",
+      password: hashedPassword,
       telefono: "2994222222",
       rol: "repartidor",
+    },
+  });
+
+  const admin1 = await prisma.usuario.create({
+    data: {
+      nombre: "Admin",
+      apellido: "Admin",
+      email: "admin@example.com",
+      password: hashedAdminPassword,
+      telefono: "2994999999",
+      rol: "admin",
     },
   });
 
