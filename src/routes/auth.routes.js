@@ -4,6 +4,7 @@ import {
   login,
   forgotPassword,
   resetPassword,
+  verifyResetToken,
   registro,
 } from "../controllers/auth.controller.js";
 
@@ -16,6 +17,7 @@ router.get("/", (req, res) => {
 router.post("/registro", registro);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
-router.get("/reset-password", resetPassword);
+router.post("/verify-reset-token", verifyResetToken);
+router.post("/reset-password", resetPassword);
 
 export default router;

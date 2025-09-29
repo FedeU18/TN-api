@@ -63,11 +63,11 @@ export const login = async (req, res) => {
 
     // Devolver token junto con información del usuario (sin password)
     const { password: _, ...userWithoutPassword } = user;
-    
-    res.json({ 
-      message: "Login exitoso", 
+
+    res.json({
+      message: "Login exitoso",
       token,
-      user: userWithoutPassword
+      user: userWithoutPassword,
     });
   } catch (error) {
     console.error(error);
@@ -136,7 +136,13 @@ export const forgotPassword = async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: "Recuperación de contraseña",
-      text: `Click en el siguiente link para resetear un contraseña: http://localhost:3000/api/auth/reset-password?token=${resetToken}.`,
+      text: `
+        Copia el siguiente token para restablecer tu contraseña. Este token es válido por 15 minutos.
+        
+        Token: ${resetToken}
+        
+        Si no solicitaste este cambio, puedes ignorar este correo.
+      `,
     };
     //Enviar email
     transporter.sendMail(mailOptions, (error, info) => {
@@ -155,6 +161,40 @@ export const forgotPassword = async (req, res) => {
   }
 };
 
+export const verifyResetToken = async (req, res) => {
+  const { token } = req.body;
+
+  //verificar si token existe
+  if (!token) {
+    return res.status(400).json({ message: "Token requerido" });
+  }
+  //verificar validez del token
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    const user = await prisma.usuario.findUnique({
+      where: { id_usuario: decoded.id },
+    });
+
+    if (
+      !user ||
+      user.resetPasswordToken !== token ||
+      !user.resetPasswordExpires ||
+      user.resetPasswordExpires < new Date()
+    ) {
+      return res
+        .status(400)
+        .json({ valid: false, message: "Token inválido o expirado" });
+    }
+
+    return res.status(200).json({ valid: true, message: "Token válido" });
+  } catch (err) {
+    return res
+      .status(400)
+      .json({ valid: false, message: "Token inválido o expirado" });
+  }
+};
+
 export const resetPassword = async (req, res) => {
   try {
     const { token, newPassword } = req.body;
@@ -165,7 +205,7 @@ export const resetPassword = async (req, res) => {
         .json({ message: "Token y nueva contraseña son requeridos" });
     }
 
-    //verifico token
+    // Verifico token
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -173,17 +213,13 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ message: "Token inválido o expirado" });
     }
 
-    //busco usuario por id y comparar el token guardado en BD
+    // Busco usuario
     const user = await prisma.usuario.findUnique({
       where: { id_usuario: decoded.id },
     });
 
-    if (!user) {
-      return res.status(404).json({ message: "Usuario no encontrado" });
-    }
-
-    //valido que el token almacenado coincida
     if (
+      !user ||
       user.resetPasswordToken !== token ||
       !user.resetPasswordExpires ||
       user.resetPasswordExpires < new Date()
@@ -191,10 +227,10 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ message: "Token inválido o expirado" });
     }
 
-    //hashear la nueva contraseña
+    // Hashear nueva contraseña
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
-    //actualizar usuario y limpiar token
+    // Actualizar y limpiar token
     await prisma.usuario.update({
       where: { id_usuario: user.id_usuario },
       data: {
