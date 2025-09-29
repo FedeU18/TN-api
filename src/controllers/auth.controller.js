@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import nodemailer from "nodemailer";
 
 const prisma = new PrismaClient();
 
@@ -99,10 +100,13 @@ export const forgotPassword = async (req, res) => {
     }
 
     //Generar token seguro
-    const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetTokenExpires = new Date(Date.now() + 1000 * 60 * 15); // expira en 15 min
+    const resetToken = jwt.sign(
+      { id: user.id_usuario, email: user.email },
+      process.env.JWT_SECRET
+    );
+    //expira en 15 minutos
+    const resetTokenExpires = new Date(Date.now() + 1000 * 60 * 15);
 
-    //Guardar en la BD (necesitas agregar campos en tu modelo Usuario)
     await prisma.usuario.update({
       where: { email },
       data: {
@@ -111,12 +115,38 @@ export const forgotPassword = async (req, res) => {
       },
     });
 
-    return res.status(200).json({
-      message: "Se envió un enlace de recuperación al correo registrado",
-      token: resetToken,
+    //inicio configuración de nodemailer
+    const transporter = nodemailer.createTransport({
+      service: "Gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+    //Estructura del mail y a quien va dirigido
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Recuperación de contraseña",
+      text: `Click en el siguiente link para resetear un contraseña: http://localhost:3000/api/auth/reset-password?token=${resetToken}.`,
+    };
+    //Enviar email
+    transporter.sendMail(mailOptions, (error, info) => {
+      if (error) {
+        console.error("Error al enviar el email:", error);
+      } else {
+        return res.status(200).json({
+          message: "Se envió un enlace de recuperación al correo registrado",
+          token: resetToken,
+        });
+      }
     });
   } catch (error) {
     console.error("Error en forgotPassword:", error);
     return res.status(500).json({ message: "Error al recuperar contraseña" });
   }
+};
+
+export const resetPassword = async (req, res) => {
+  res.status(501).json({ message: "Función no implementada" });
 };
