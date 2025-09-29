@@ -61,7 +61,14 @@ export const login = async (req, res) => {
       { expiresIn: "1h" }
     );
 
-    res.json({ message: "Login exitoso", token });
+    // Devolver token junto con información del usuario (sin password)
+    const { password: _, ...userWithoutPassword } = user;
+    
+    res.json({ 
+      message: "Login exitoso", 
+      token,
+      user: userWithoutPassword
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Error en el login" });
