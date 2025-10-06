@@ -28,7 +28,7 @@ export const asignarPedido = async (req, res) => {
   const adminId = req.user.id_usuario;
 
   try {
-    // 1️⃣ Validar que el usuario autenticado sea admin
+    //Validar que el usuario autenticado sea admin
     const admin = await prisma.usuario.findUnique({
       where: { id_usuario: adminId },
     });
@@ -39,20 +39,18 @@ export const asignarPedido = async (req, res) => {
         .json({ message: "No autorizado para asignar pedidos" });
     }
 
-    // 2️⃣ Validar que el repartidor exista y tenga rol correcto
+    //Validar que el repartidor exista y tenga rol correcto
     const repartidor = await prisma.usuario.findUnique({
       where: { id_usuario: id_repartidor },
     });
 
     if (!repartidor || repartidor.rol.toLowerCase() !== "repartidor") {
-      return res
-        .status(400)
-        .json({
-          message: "El usuario seleccionado no es un repartidor válido",
-        });
+      return res.status(400).json({
+        message: "El usuario seleccionado no es un repartidor válido",
+      });
     }
 
-    // 3️⃣ Validar que el pedido exista y no esté asignado
+    //Validar que el pedido exista y no esté asignado
     const pedido = await prisma.pedido.findUnique({
       where: { id_pedido: Number(id) },
       include: { estado: true },
@@ -66,19 +64,17 @@ export const asignarPedido = async (req, res) => {
         .status(400)
         .json({ message: "El pedido ya está asignado a un repartidor" });
 
-    // 4️⃣ Buscar estado "Asignado"
+    //Buscar estado "Asignado"
     const estadoAsignado = await prisma.estadoPedido.findFirst({
       where: { nombre_estado: "Asignado" },
     });
 
     if (!estadoAsignado)
-      return res
-        .status(500)
-        .json({
-          message: "No existe el estado 'Asignado' en la base de datos",
-        });
+      return res.status(500).json({
+        message: "No existe el estado 'Asignado' en la base de datos",
+      });
 
-    // 5️⃣ Actualizar pedido
+    //Actualizar pedido
     const pedidoActualizado = await prisma.pedido.update({
       where: { id_pedido: Number(id) },
       data: {
@@ -92,7 +88,7 @@ export const asignarPedido = async (req, res) => {
       },
     });
 
-    // 6️⃣ Crear notificación para el repartidor
+    //Crear notificación para el repartidor
     const tipoNotif = await prisma.tipoNotificacion.findFirst({
       where: { nombre_tipo: "Asignación de pedido" },
     });

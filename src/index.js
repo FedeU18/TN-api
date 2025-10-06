@@ -6,6 +6,8 @@ import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import pedidoRoutes from "./routes/pedido.routes.js";
+import adminRoutes from "./routes/admin.routes.js";
+
 dotenv.config();
 
 const app = express();
@@ -19,6 +21,7 @@ app.use(express.json());
 app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/pedidos", pedidoRoutes);
+app.use("/api/admin", adminRoutes);
 
 // Manejo de errores
 app.use(errorHandler);
