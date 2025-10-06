@@ -1,5 +1,5 @@
-import { PrismaClient } from '@prisma/client';
-import bcrypt from 'bcrypt';
+import { PrismaClient } from "@prisma/client";
+import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
@@ -69,6 +69,9 @@ async function main() {
   // 2. Estados de pedido
   const pendiente = await prisma.estadoPedido.create({
     data: { nombre_estado: "Pendiente" },
+  });
+  const asignado = await prisma.estadoPedido.create({
+    data: { nombre_estado: "Asignado" },
   });
 
   const enCamino = await prisma.estadoPedido.create({
