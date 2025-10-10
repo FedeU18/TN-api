@@ -1,13 +1,13 @@
 import prisma from "../lib/prisma.js";
+import { io } from "../index.js";
 
+//Obtener pedidos disponibles (para asignar)
 export const getPedidosDisponibles = async (req, res) => {
   try {
     const pedidos = await prisma.pedido.findMany({
       where: {
         id_repartidor: null,
-        estado: {
-          nombre_estado: "Pendiente", // puede ajustarse al nombre que uses
-        },
+        estado: { nombre_estado: "Pendiente" },
       },
       include: {
         cliente: true,
@@ -22,13 +22,14 @@ export const getPedidosDisponibles = async (req, res) => {
   }
 };
 
+//Asignar pedido a repartidor
 export const asignarPedido = async (req, res) => {
-  const { id } = req.params; // ID del pedido
+  const { id } = req.params;
   const { id_repartidor } = req.body;
   const adminId = req.user.id_usuario;
 
   try {
-    //Validar que el usuario autenticado sea admin
+    //Validar admin
     const admin = await prisma.usuario.findUnique({
       where: { id_usuario: adminId },
     });
@@ -39,7 +40,7 @@ export const asignarPedido = async (req, res) => {
         .json({ message: "No autorizado para asignar pedidos" });
     }
 
-    //Validar que el repartidor exista y tenga rol correcto
+    //Validar repartidor
     const repartidor = await prisma.usuario.findUnique({
       where: { id_usuario: id_repartidor },
     });
@@ -50,7 +51,7 @@ export const asignarPedido = async (req, res) => {
       });
     }
 
-    //Validar que el pedido exista y no esté asignado
+    //Validar pedido
     const pedido = await prisma.pedido.findUnique({
       where: { id_pedido: Number(id) },
       include: { estado: true },
@@ -60,11 +61,9 @@ export const asignarPedido = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado" });
 
     if (pedido.id_repartidor)
-      return res
-        .status(400)
-        .json({ message: "El pedido ya está asignado a un repartidor" });
+      return res.status(400).json({ message: "El pedido ya está asignado" });
 
-    //Buscar estado "Asignado"
+    //Estado "Asignado"
     const estadoAsignado = await prisma.estadoPedido.findFirst({
       where: { nombre_estado: "Asignado" },
     });
@@ -78,7 +77,7 @@ export const asignarPedido = async (req, res) => {
     const pedidoActualizado = await prisma.pedido.update({
       where: { id_pedido: Number(id) },
       data: {
-        id_repartidor: id_repartidor,
+        id_repartidor,
         id_estado: estadoAsignado.id_estado,
       },
       include: {
@@ -88,7 +87,7 @@ export const asignarPedido = async (req, res) => {
       },
     });
 
-    //Crear notificación para el repartidor
+    //Crear notificación
     const tipoNotif = await prisma.tipoNotificacion.findFirst({
       where: { nombre_tipo: "Asignación de pedido" },
     });
@@ -104,12 +103,79 @@ export const asignarPedido = async (req, res) => {
       });
     }
 
+    //Emitir actualización en tiempo real
+    io.to(`pedido_${pedidoActualizado.id_pedido}`).emit("estadoActualizado", {
+      pedidoId: pedidoActualizado.id_pedido,
+      nuevoEstado: pedidoActualizado.estado.nombre_estado,
+    });
+
     res.json({
-      message: "Pedido asignado correctamente al repartidor seleccionado",
+      message: "Pedido asignado correctamente",
       pedido: pedidoActualizado,
     });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al asignar el pedido" });
+  }
+};
+
+//Monitorear un pedido específico
+export const monitorPedido = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(id) },
+      include: {
+        cliente: true,
+        repartidor: true,
+        estado: true,
+      },
+    });
+
+    if (!pedido)
+      return res.status(404).json({ message: "Pedido no encontrado" });
+
+    res.json({
+      message: `Monitoreando el estado del pedido #${id}`,
+      pedido,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al obtener el pedido" });
+  }
+};
+
+//Actualizar estado de un pedido (En camino, Entregado, etc.)
+export const actualizarEstadoPedido = async (req, res) => {
+  const { id } = req.params;
+  const { nuevoEstado } = req.body;
+
+  try {
+    const estado = await prisma.estadoPedido.findFirst({
+      where: { nombre_estado: nuevoEstado },
+    });
+
+    if (!estado) return res.status(400).json({ message: "Estado no válido" });
+
+    const pedidoActualizado = await prisma.pedido.update({
+      where: { id_pedido: Number(id) },
+      data: { id_estado: estado.id_estado },
+      include: { estado: true, cliente: true, repartidor: true },
+    });
+
+    //Emitir actualización por Socket.IO
+    io.to(`pedido_${id}`).emit("estadoActualizado", {
+      pedidoId: pedidoActualizado.id_pedido,
+      nuevoEstado: pedidoActualizado.estado.nombre_estado,
+    });
+
+    res.json({
+      message: `Estado del pedido actualizado a ${nuevoEstado}`,
+      pedido: pedidoActualizado,
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al actualizar estado del pedido" });
   }
 };
