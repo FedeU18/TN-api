@@ -1,11 +1,10 @@
 import prisma from "../lib/prisma.js";
 
-// GET /reportes/desempeno
 export const getReporteDesempeno = async (req, res) => {
   try {
     const { fechaInicio, fechaFin, id_repartidor } = req.query;
 
-    // 1️⃣ Filtrar pedidos por rango de fechas si se proveen
+    // 1️⃣ Filtros base
     const filtros = {};
     if (fechaInicio && fechaFin) {
       filtros.fecha_creacion = {
@@ -13,13 +12,11 @@ export const getReporteDesempeno = async (req, res) => {
         lte: new Date(fechaFin),
       };
     }
-
-    // Si se filtra por repartidor específico
     if (id_repartidor) {
       filtros.id_repartidor = Number(id_repartidor);
     }
 
-    // 2️⃣ Obtener pedidos con su estado y fechas
+    // 2️⃣ Obtener pedidos con estado y repartidor
     const pedidos = await prisma.pedido.findMany({
       where: filtros,
       include: {
@@ -41,11 +38,11 @@ export const getReporteDesempeno = async (req, res) => {
       });
     }
 
-    // 3️⃣ Calcular métricas
+    // 3️⃣ Cálculos generales
     let entregados = 0;
     let pendientes = 0;
     let cancelados = 0;
-    let tiemposEntrega = []; // horas de entrega de pedidos entregados
+    const tiemposEntrega = [];
 
     for (const pedido of pedidos) {
       const estado = pedido.estado.nombre_estado.toLowerCase();
@@ -57,23 +54,27 @@ export const getReporteDesempeno = async (req, res) => {
             (1000 * 60 * 60);
           tiemposEntrega.push(horas);
         }
-      } else if (estado === "pendiente" || estado === "asignado") {
+      } else if (["pendiente", "asignado"].includes(estado)) {
         pendientes++;
       } else if (estado === "cancelado") {
         cancelados++;
       }
     }
 
-    const promedioEntrega = tiemposEntrega.length
-      ? (
-          tiemposEntrega.reduce((a, b) => a + b, 0) / tiemposEntrega.length
-        ).toFixed(2)
-      : 0;
+    const promedioEntrega =
+      tiemposEntrega.length > 0
+        ? (
+            tiemposEntrega.reduce((a, b) => a + b, 0) / tiemposEntrega.length
+          ).toFixed(2)
+        : 0;
 
-    // 4️⃣ Agrupación de desempeño por repartidor
+    // 4️⃣ Desempeño por repartidor
     const desempeñoPorRepartidor = await prisma.pedido.groupBy({
       by: ["id_repartidor"],
-      where: filtros,
+      where: {
+        ...filtros,
+        id_repartidor: { not: null },
+      },
       _count: { id_pedido: true },
     });
 
@@ -87,32 +88,31 @@ export const getReporteDesempeno = async (req, res) => {
         const entregados = await prisma.pedido.count({
           where: {
             id_repartidor: rep.id_repartidor,
-            estado: { nombre_estado: "Entregado" },
+            estado: { is: { nombre_estado: "Entregado" } },
           },
         });
 
         const cancelados = await prisma.pedido.count({
           where: {
             id_repartidor: rep.id_repartidor,
-            estado: { nombre_estado: "Cancelado" },
+            estado: { is: { nombre_estado: "Cancelado" } },
           },
         });
 
-        const promedioHoras = await prisma.pedido.findMany({
+        const pedidosEntregados = await prisma.pedido.findMany({
           where: {
             id_repartidor: rep.id_repartidor,
-            estado: { nombre_estado: "Entregado" },
+            estado: { is: { nombre_estado: "Entregado" } },
+            NOT: { fecha_entrega: null },
           },
           select: { fecha_creacion: true, fecha_entrega: true },
         });
 
-        const horas = promedioHoras
-          .filter((p) => p.fecha_entrega)
-          .map(
-            (p) =>
-              (new Date(p.fecha_entrega) - new Date(p.fecha_creacion)) /
-              (1000 * 60 * 60)
-          );
+        const horas = pedidosEntregados.map(
+          (p) =>
+            (new Date(p.fecha_entrega) - new Date(p.fecha_creacion)) /
+            (1000 * 60 * 60)
+        );
 
         return {
           id_repartidor: rep.id_repartidor,
@@ -122,14 +122,14 @@ export const getReporteDesempeno = async (req, res) => {
           total_pedidos: rep._count.id_pedido,
           entregados,
           cancelados,
-          promedio_horas_entrega: horas.length
-            ? (horas.reduce((a, b) => a + b, 0) / horas.length).toFixed(2)
-            : 0,
+          promedio_horas_entrega:
+            horas.length > 0
+              ? (horas.reduce((a, b) => a + b, 0) / horas.length).toFixed(2)
+              : 0,
         };
       })
     );
 
-    // 5️⃣ Respuesta final
     res.json({
       resumen: {
         total_pedidos: pedidos.length,
@@ -142,8 +142,9 @@ export const getReporteDesempeno = async (req, res) => {
     });
   } catch (error) {
     console.error(error);
-    res
-      .status(500)
-      .json({ message: "Error al generar el reporte de desempeño" });
+    res.status(500).json({
+      message: "Error al generar el reporte de desempeño",
+      error: error.message,
+    });
   }
 };
