@@ -19,5 +19,8 @@
 
 - obtener pedidos disponibles: GET http://localhost:3000/api/pedidos/disponibles
 - asignar pedido: PUT http://localhost:3000/api/pedidos/asignar/:id
+- tomar pedido: PUT http://localhost:3000/api/pedidos/tomar/:id
 - monitorear estado de pedido: GET http://localhost:3000/api/pedidos/monitor/:id
 - actualizar estado de pedido: PUT http://localhost:3000/api/pedidos/estado/:id
+- obtener pedidos asignados a un repartidor: GET http://localhost:3000/api/pedidos/estado/mis-pedidos
+- obtener pedidos asignados a un repartidor: GET http://localhost:3000/api/pedidos/estado/mis-pedidos
