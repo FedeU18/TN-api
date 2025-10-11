@@ -6,73 +6,99 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Iniciando seed extendido...");
 
+  await prisma.pedido.deleteMany({});
+  await prisma.notificacion.deleteMany({});
+  await prisma.usuario.deleteMany({});
+  await prisma.estadoPedido.deleteMany({});
+  await prisma.tipoNotificacion.deleteMany({});
+  
   const hashedPassword = await bcrypt.hash("password!123", 10);
   const hashedAdminPassword = await bcrypt.hash("admin!123", 10);
 
   // === Usuarios ===
-  const clientes = await prisma.usuario.createMany({
-    data: [
-      {
-        nombre: "Ana",
-        apellido: "Gómez",
-        email: "ana@example.com",
-        password: hashedPassword,
-        telefono: "2994001111",
-        rol: "cliente",
-      },
-      {
-        nombre: "Luis",
-        apellido: "Fernández",
-        email: "luis@example.com",
-        password: hashedPassword,
-        telefono: "2994002222",
-        rol: "cliente",
-      },
-      {
-        nombre: "Sofía",
-        apellido: "Martínez",
-        email: "sofia@example.com",
-        password: hashedPassword,
-        telefono: "2994003333",
-        rol: "cliente",
-      },
-      {
-        nombre: "Carlos",
-        apellido: "Vega",
-        email: "carlos@example.com",
-        password: hashedPassword,
-        telefono: "2994004444",
-        rol: "cliente",
-      },
-      {
-        nombre: "Julieta",
-        apellido: "López",
-        email: "julieta@example.com",
-        password: hashedPassword,
-        telefono: "2994005555",
-        rol: "cliente",
-      },
-    ],
+ 
+  // Clientes - se usa create() porque necesitamos sus IDs para los pedidos
+  const cliente1 = await prisma.usuario.create({
+    data: {
+      nombre: "Ana",
+      apellido: "Gómez",
+      email: "ana@example.com",
+      password: hashedPassword,
+      telefono: "2994001111",
+      rol: "cliente",
+    },
   });
 
-  const repartidores = await prisma.usuario.createMany({
+  const cliente2 = await prisma.usuario.create({
+    data: {
+      nombre: "Luis",
+      apellido: "Fernández",
+      email: "luis@example.com",
+      password: hashedPassword,
+      telefono: "2994002222",
+      rol: "cliente",
+    },
+  });
+
+  const cliente3 = await prisma.usuario.create({
+    data: {
+      nombre: "Sofía",
+      apellido: "Martínez",
+      email: "sofia@example.com",
+      password: hashedPassword,
+      telefono: "2994003333",
+      rol: "cliente",
+    },
+  });
+
+  const cliente4 = await prisma.usuario.create({
+    data: {
+      nombre: "Carlos",
+      apellido: "Vega",
+      email: "carlos@example.com",
+      password: hashedPassword,
+      telefono: "2994004444",
+      rol: "cliente",
+    },
+  });
+
+  const cliente5 = await prisma.usuario.create({
+    data: {
+      nombre: "Julieta",
+      apellido: "López",
+      email: "julieta@example.com",
+      password: hashedPassword,
+      telefono: "2994005555",
+      rol: "cliente",
+    },
+  });
+
+  // Repartidores - se usa create() porque necesitamos sus IDs para los pedidos
+  const repartidor1 = await prisma.usuario.create({
+    data: {
+      nombre: "María",
+      apellido: "Pérez",
+      email: "maria@example.com",
+      password: hashedPassword,
+      telefono: "2994111111",
+      rol: "repartidor",
+    },
+  });
+
+  const repartidor2 = await prisma.usuario.create({
+    data: {
+      nombre: "Jorge",
+      apellido: "Sosa",
+      email: "jorge@example.com",
+      password: hashedPassword,
+      telefono: "2994222222",
+      rol: "repartidor",
+    },
+  });
+
+  // Repartidores adicionales - se usa createMany() porque no los necesitamos referenciar
+  await prisma.usuario.createMany({
     data: [
-      {
-        nombre: "María",
-        apellido: "Pérez",
-        email: "maria@example.com",
-        password: hashedPassword,
-        telefono: "2994111111",
-        rol: "repartidor",
-      },
-      {
-        nombre: "Jorge",
-        apellido: "Sosa",
-        email: "jorge@example.com",
-        password: hashedPassword,
-        telefono: "2994222222",
-        rol: "repartidor",
-      },
       {
         nombre: "Lucas",
         apellido: "Benítez",
@@ -100,6 +126,7 @@ async function main() {
     ],
   });
 
+  // Admin
   const admin = await prisma.usuario.create({
     data: {
       nombre: "Admin",
@@ -110,7 +137,7 @@ async function main() {
       rol: "admin",
     },
   });
-
+  
   // === Estados de pedido ===
   const pendiente = await prisma.estadoPedido.upsert({
     where: { nombre_estado: "Pendiente" },
@@ -133,46 +160,55 @@ async function main() {
     create: { nombre_estado: "Entregado" },
   });
 
+
   // === Pedidos ===
   const pedidos = await prisma.pedido.createMany({
     data: [
+      // Pedidos DISPONIBLES (sin repartidor asignado)
       {
-        id_cliente: 1,
+        id_cliente: cliente1.id_usuario,
         direccion_origen: "Calle 123",
         direccion_destino: "Av. 456",
         id_estado: pendiente.id_estado,
         qr_codigo: "QR001",
+        id_repartidor: null,
       },
       {
-        id_cliente: 2,
+        id_cliente: cliente2.id_usuario,
         direccion_origen: "Boulevard 789",
         direccion_destino: "Ruta 101",
         id_estado: pendiente.id_estado,
         qr_codigo: "QR002",
+        id_repartidor: null,
       },
       {
-        id_cliente: 3,
+        id_cliente: cliente3.id_usuario,
         direccion_origen: "Mitre 555",
         direccion_destino: "San Martín 900",
         id_estado: pendiente.id_estado,
         qr_codigo: "QR003",
+        id_repartidor: null,
       },
+      // Pedidos EN PROCESO (ya asignados)
       {
-        id_cliente: 4,
+        id_cliente: cliente4.id_usuario,
         direccion_origen: "Libertad 222",
         direccion_destino: "Belgrano 800",
         id_estado: enCamino.id_estado,
         qr_codigo: "QR004",
+        id_repartidor: repartidor1.id_usuario,
       },
       {
-        id_cliente: 5,
+        id_cliente: cliente5.id_usuario,
         direccion_origen: "Italia 300",
         direccion_destino: "España 1000",
         id_estado: entregado.id_estado,
         qr_codigo: "QR005",
+        id_repartidor: repartidor2.id_usuario,
       },
     ],
   });
+  
 
   // === Tipos de notificación ===
   const tipoNuevo = await prisma.tipoNotificacion.upsert({
@@ -190,7 +226,6 @@ async function main() {
     update: {},
     create: { nombre_tipo: "Asignación de pedido" },
   });
-
   console.log("✅ Seed extendido completado.");
 }
 
