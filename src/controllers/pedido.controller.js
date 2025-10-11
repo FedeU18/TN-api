@@ -1,6 +1,64 @@
 import prisma from "../lib/prisma.js";
 import { io } from "../index.js";
 
+export const getAllPedidos = async (req, res) => {
+  try {
+    const userId = req.user.id_usuario;
+
+    // Validar que sea admin
+    const admin = await prisma.usuario.findUnique({
+      where: { id_usuario: userId },
+    });
+
+    if (!admin || admin.rol.toLowerCase() !== "admin") {
+      return res
+        .status(403)
+        .json({
+          message: "Solo los administradores pueden ver todos los pedidos",
+        });
+    }
+
+    // Obtener todos los pedidos
+    const pedidos = await prisma.pedido.findMany({
+      include: {
+        cliente: {
+          select: {
+            id_usuario: true,
+            nombre: true,
+            apellido: true,
+            email: true,
+          },
+        },
+        repartidor: {
+          select: {
+            id_usuario: true,
+            nombre: true,
+            apellido: true,
+            email: true,
+          },
+        },
+        estado: {
+          select: {
+            nombre_estado: true,
+          },
+        },
+      },
+      orderBy: {
+        fecha_creacion: "desc",
+      },
+    });
+
+    if (pedidos.length === 0) {
+      return res.status(404).json({ message: "No hay pedidos registrados" });
+    }
+
+    res.json(pedidos);
+  } catch (error) {
+    console.error("Error en getAllPedidos:", error);
+    res.status(500).json({ message: "Error al obtener todos los pedidos" });
+  }
+};
+
 //Obtener pedidos disponibles (para asignar)
 export const getPedidosDisponibles = async (req, res) => {
   try {
@@ -48,7 +106,7 @@ export const getMisPedidos = async (req, res) => {
         estado: true,
       },
       orderBy: {
-        fecha_creacion: 'desc',
+        fecha_creacion: "desc",
       },
     });
 
@@ -265,7 +323,7 @@ export const monitorPedido = async (req, res) => {
       pedido,
     });
     */
-   res.json(pedido);
+    res.json(pedido);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Error al obtener el pedido" });

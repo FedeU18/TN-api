@@ -6,11 +6,13 @@ import {
   asignarPedido,
   monitorPedido,
   actualizarEstadoPedido,
+  getAllPedidos,
 } from "../controllers/pedido.controller.js";
 import verifyJWT from "../middlewares/jwt.js";
 
 const router = express.Router();
 
+router.get("/", verifyJWT, getAllPedidos);
 router.get("/disponibles", verifyJWT, getPedidosDisponibles);
 router.get("/mis-pedidos", verifyJWT, getMisPedidos);
 router.get("/:id", verifyJWT, monitorPedido);
