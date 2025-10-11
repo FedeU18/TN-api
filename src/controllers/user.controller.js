@@ -102,3 +102,51 @@ export const changePassword = async (req, res) => {
     return res.status(500).json({ message: "Error al cambiar contraseña" });
   }
 };
+
+export const getUserOrders = async (req, res) => {
+  try {
+    const { id_usuario, rol } = req.user;
+
+    // Verificar que el usuario sea cliente
+    if (rol.toLowerCase() !== "cliente") {
+      return res.status(403).json({
+        message: "Solo los clientes pueden ver su historial de pedidos",
+      });
+    }
+
+    // Buscar pedidos del cliente autenticado
+    const pedidos = await prisma.pedido.findMany({
+      where: {
+        id_cliente: id_usuario,
+      },
+      include: {
+        estado: {
+          select: { nombre_estado: true },
+        },
+      },
+      orderBy: {
+        fecha_creacion: "desc",
+      },
+    });
+
+    if (pedidos.length === 0) {
+      return res.status(404).json({ message: "No hay pedidos registrados" });
+    }
+
+    // Formatear respuesta
+    const historial = pedidos.map((p) => ({
+      id_pedido: p.id_pedido,
+      fecha: p.fecha_creacion,
+      direccion: p.direccion_entrega,
+      estado: p.estado?.nombre_estado || "Desconocido",
+      total: p.total || 0,
+    }));
+
+    return res.json(historial);
+  } catch (error) {
+    console.error("Error en getUserOrders:", error);
+    return res
+      .status(500)
+      .json({ message: "Error al obtener historial de pedidos" });
+  }
+};
