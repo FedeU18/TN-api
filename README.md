@@ -29,3 +29,8 @@
 
 - obtener todos sus pedidos: GET http://localhost:3000/api/clientes/pedidos
 - obtener detalle de un pedido: GET http://localhost:3000/api/clientes/pedidos/:id
+
+## Repartidor
+
+- obtener ubicación del repartidor en un pedido: GET http://localhost:3000/api/repartidores/ubicacion/:id_pedido
+- actualizar ubicación del repartidor en un pedido: PUT http://localhost:3000/api/repartidores/ubicacion

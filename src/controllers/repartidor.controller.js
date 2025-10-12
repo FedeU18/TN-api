@@ -75,3 +75,54 @@ export const enviarUbicacion = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
+
+export const obtenerUbicacion = async (req, res) => {
+  try {
+    const { id_usuario, rol } = req.user;
+    const { id_pedido } = req.params;
+
+    // Validar parámetros
+    if (!id_pedido) {
+      return res.status(400).json({ message: "Debe enviar un id_pedido." });
+    }
+
+    // Validar que el pedido exista
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(id_pedido) },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado." });
+    }
+
+    // Si el usuario es repartidor, validar que sea el suyo
+    if (
+      rol.toLowerCase() === "repartidor" &&
+      pedido.id_repartidor !== id_usuario
+    ) {
+      return res.status(403).json({
+        message: "Este pedido no pertenece al repartidor actual.",
+      });
+    }
+
+    // Buscar la última ubicación registrada para este pedido
+    const ultimaUbicacion = await prisma.ubicacion.findFirst({
+      where: { id_pedido: Number(id_pedido) },
+      orderBy: { id_ubicacion: "desc" }, // la última registrada
+    });
+
+    if (!ultimaUbicacion) {
+      return res
+        .status(404)
+        .json({ message: "No hay ubicaciones registradas para este pedido." });
+    }
+
+    res.json({
+      message: "Última ubicación del repartidor obtenida correctamente.",
+      ubicacion: ultimaUbicacion,
+    });
+  } catch (error) {
+    console.error("❌ Error al obtener ubicación:", error);
+    res.status(500).json({ message: "Error interno del servidor." });
+  }
+};
