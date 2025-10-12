@@ -137,7 +137,7 @@ export const getUserOrders = async (req, res) => {
     const historial = pedidos.map((p) => ({
       id_pedido: p.id_pedido,
       fecha: p.fecha_creacion,
-      direccion: p.direccion_entrega,
+      direccion: p.direccion_destino,
       estado: p.estado?.nombre_estado || "Desconocido",
       total: p.total || 0,
     }));
