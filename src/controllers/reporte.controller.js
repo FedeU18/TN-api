@@ -130,15 +130,53 @@ export const getReporteDesempeno = async (req, res) => {
       })
     );
 
+    // 5️⃣ Respuesta
+    const series = [];
+
+    const pedidosPorFecha = {};
+
+    for (const pedido of pedidos) {
+      const fecha = new Date(pedido.fecha_creacion).toISOString().split("T")[0];
+      if (!pedidosPorFecha[fecha]) {
+        pedidosPorFecha[fecha] = { fecha, entregados: 0, cancelados: 0, tiempoPromedio: 0, count: 0 };
+      }
+
+      const estado = pedido.estado.nombre_estado.toLowerCase();
+      if (estado === "entregado") pedidosPorFecha[fecha].entregados++;
+      if (estado === "cancelado") pedidosPorFecha[fecha].cancelados++;
+
+      if (pedido.fecha_entrega) {
+        const horas =
+          (new Date(pedido.fecha_entrega) - new Date(pedido.fecha_creacion)) / (1000 * 60 * 60);
+        pedidosPorFecha[fecha].tiempoPromedio += horas;
+        pedidosPorFecha[fecha].count++;
+      }
+    }
+
+    //promediar los tiempos
+    for (const fecha in pedidosPorFecha) {
+      const d = pedidosPorFecha[fecha];
+      d.tiempoPromedio = d.count > 0
+        ? ((d.tiempoPromedio / d.count) * 60).toFixed(2)
+        : 0;
+      series.push({
+        fecha: d.fecha,
+        entregados: d.entregados,
+        cancelados: d.cancelados,
+        tiempoPromedio: d.tiempoPromedio,
+      });
+    }
+
     res.json({
       resumen: {
         total_pedidos: pedidos.length,
         entregados,
         pendientes,
         cancelados,
-        promedio_entrega_horas: promedioEntrega,
+        promedio_entrega_horas: promedioEntrega > 0 ? (promedioEntrega * 60).toFixed(2) : 0,
       },
       detalle_repartidores: detalleRepartidores,
+      series,
     });
   } catch (error) {
     console.error(error);
