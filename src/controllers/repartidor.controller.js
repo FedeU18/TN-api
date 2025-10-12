@@ -49,8 +49,18 @@ export const enviarUbicacion = async (req, res) => {
     }
 
     // Registrar ubicación
-    const ubicacion = await prisma.ubicacion.create({
-      data: {
+    const ubicacion = await prisma.ubicacion.upsert({
+      where: {
+        id_pedido_id_tipo: {
+          id_pedido: Number(id_pedido),
+          id_tipo: tipoUbicacion.id_estado,
+        },
+      },
+      update: {
+        latitud: parseFloat(latitud),
+        longitud: parseFloat(longitud),
+      },
+      create: {
         id_pedido: Number(id_pedido),
         id_tipo: tipoUbicacion.id_estado,
         latitud: parseFloat(latitud),

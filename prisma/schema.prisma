@@ -72,14 +72,16 @@ model TipoUbicacion {
 }
 
 model Ubicacion {
-  id_ubicacion Int       @id @default(autoincrement())
+  id_ubicacion Int @id @default(autoincrement())
   id_pedido    Int
   id_tipo      Int
-  latitud      Decimal
-  longitud     Decimal
+  latitud      Decimal @db.Decimal(10, 7)
+  longitud     Decimal @db.Decimal(10, 7)
 
-  pedido       Pedido     @relation(fields: [id_pedido], references: [id_pedido])
-  tipo         TipoUbicacion @relation(fields: [id_tipo], references: [id_estado])
+  pedido Pedido @relation(fields: [id_pedido], references: [id_pedido])
+  tipo   TipoUbicacion @relation(fields: [id_tipo], references: [id_estado])
+
+  @@unique([id_pedido, id_tipo]) // 👈 esto
 }
 
 model Calificacion {

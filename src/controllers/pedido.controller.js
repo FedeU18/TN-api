@@ -364,3 +364,50 @@ export const actualizarEstadoPedido = async (req, res) => {
     res.status(500).json({ message: "Error al actualizar estado del pedido" });
   }
 };
+export const obtenerUbicacionRepartidor = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(id) },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    const tipoUbicacion = await prisma.tipoUbicacion.findFirst({
+      where: { nombre_estado: "Actual" },
+    });
+
+    if (!tipoUbicacion) {
+      return res
+        .status(500)
+        .json({ message: "Tipo de ubicación 'Actual' no existe" });
+    }
+
+    const ubicacion = await prisma.ubicacion.findFirst({
+      where: {
+        id_pedido: Number(id),
+        id_tipo: tipoUbicacion.id_estado,
+      },
+      orderBy: { id_ubicacion: "desc" }, // por si tenés historial
+    });
+
+    if (!ubicacion) {
+      return res
+        .status(404)
+        .json({ message: "No hay ubicación disponible para este pedido" });
+    }
+
+    res.json({
+      pedidoId: pedido.id_pedido,
+      latitud: ubicacion.latitud,
+      longitud: ubicacion.longitud,
+      fecha: ubicacion.fecha_registro ?? null,
+    });
+  } catch (error) {
+    console.error("❌ Error al obtener ubicación:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
