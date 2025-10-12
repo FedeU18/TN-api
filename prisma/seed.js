@@ -6,18 +6,22 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Iniciando seed extendido...");
 
+  // 🔹 Borrar primero tablas dependientes
+  await prisma.ubicacion.deleteMany({});
   await prisma.notificacion.deleteMany({});
+  await prisma.calificacion.deleteMany({});
+
+  // 🔹 Luego tablas independientes
   await prisma.pedido.deleteMany({});
-  await prisma.usuario.deleteMany({});
   await prisma.estadoPedido.deleteMany({});
+  await prisma.tipoUbicacion.deleteMany({});
   await prisma.tipoNotificacion.deleteMany({});
+  await prisma.usuario.deleteMany({});
 
   const hashedPassword = await bcrypt.hash("password!123", 10);
   const hashedAdminPassword = await bcrypt.hash("admin!123", 10);
 
   // === Usuarios ===
-
-  // Clientes - se usa create() porque necesitamos sus IDs para los pedidos
   const cliente1 = await prisma.usuario.create({
     data: {
       nombre: "Ana",
@@ -73,7 +77,6 @@ async function main() {
     },
   });
 
-  // Repartidores - se usa create() porque necesitamos sus IDs para los pedidos
   const repartidor1 = await prisma.usuario.create({
     data: {
       nombre: "María",
@@ -96,7 +99,6 @@ async function main() {
     },
   });
 
-  // Repartidores adicionales - se usa createMany() porque no los necesitamos referenciar
   await prisma.usuario.createMany({
     data: [
       {
@@ -126,7 +128,6 @@ async function main() {
     ],
   });
 
-  // Admin
   const admin = await prisma.usuario.create({
     data: {
       nombre: "Admin",
@@ -161,9 +162,8 @@ async function main() {
   });
 
   // === Pedidos ===
-  const pedidos = await prisma.pedido.createMany({
+  await prisma.pedido.createMany({
     data: [
-      // Pedidos DISPONIBLES (sin repartidor asignado)
       {
         id_cliente: cliente1.id_usuario,
         direccion_origen: "Calle 123",
@@ -188,7 +188,6 @@ async function main() {
         qr_codigo: "QR003",
         id_repartidor: null,
       },
-      // Pedidos EN PROCESO (ya asignados)
       {
         id_cliente: cliente4.id_usuario,
         direccion_origen: "Libertad 222",
@@ -209,21 +208,23 @@ async function main() {
   });
 
   // === Tipos de notificación ===
-  const tipoNuevo = await prisma.tipoNotificacion.upsert({
-    where: { nombre_tipo: "Nuevo Pedido" },
-    update: {},
-    create: { nombre_tipo: "Nuevo Pedido" },
+  await prisma.tipoNotificacion.createMany({
+    data: [
+      { nombre_tipo: "Nuevo Pedido" },
+      { nombre_tipo: "Pedido Entregado" },
+      { nombre_tipo: "Asignación de pedido" },
+    ],
   });
-  const tipoEntrega = await prisma.tipoNotificacion.upsert({
-    where: { nombre_tipo: "Pedido Entregado" },
-    update: {},
-    create: { nombre_tipo: "Pedido Entregado" },
+
+  // === Tipos de ubicación ===
+  await prisma.tipoUbicacion.createMany({
+    data: [
+      { nombre_estado: "Actual" },
+      { nombre_estado: "En ruta" },
+      { nombre_estado: "Entrega" },
+    ],
   });
-  const tipoAsignacion = await prisma.tipoNotificacion.upsert({
-    where: { nombre_tipo: "Asignación de pedido" },
-    update: {},
-    create: { nombre_tipo: "Asignación de pedido" },
-  });
+
   console.log("✅ Seed extendido completado.");
 }
 

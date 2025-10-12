@@ -10,6 +10,7 @@ import userRoutes from "./routes/user.routes.js";
 import pedidoRoutes from "./routes/pedido.routes.js";
 import adminRoutes from "./routes/admin.routes.js";
 import errorHandler from "./middlewares/errorHandler.js";
+import repartidorRoutes from "./routes/repartidor.routes.js";
 
 dotenv.config();
 
@@ -41,6 +42,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/pedidos", pedidoRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/repartidores", repartidorRoutes);
 
 // Manejo de errores
 app.use(errorHandler);
