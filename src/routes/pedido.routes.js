@@ -18,7 +18,7 @@ router.get("/mis-pedidos", verifyJWT, getMisPedidos);
 router.get("/:id", verifyJWT, monitorPedido);
 router.put("/tomar/:id", verifyJWT, tomarPedido);
 router.put("/asignar/:id", verifyJWT, asignarPedido);
-router.get("/monitor/:id", verifyJWT, asignarPedido);
+router.get("/monitor/:id", verifyJWT, monitorPedido);
 router.put("/estado/:id", verifyJWT, actualizarEstadoPedido);
 
 export default router;

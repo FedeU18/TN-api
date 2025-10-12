@@ -4,7 +4,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import http from "http";
 import { Server } from "socket.io";
-
+import logger from "morgan";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import pedidoRoutes from "./routes/pedido.routes.js";
@@ -28,6 +28,7 @@ export const io = new Server(server, {
 // Middlewares
 app.use(cors());
 app.use(express.json());
+app.use(logger("dev"));
 
 //Middleware para compartir el socket con las rutas
 app.use((req, res, next) => {
@@ -52,6 +53,7 @@ io.on("connection", (socket) => {
   socket.on("joinPedido", (pedidoId) => {
     socket.join(`pedido_${pedidoId}`);
     console.log(`📦 Usuario ${socket.id} se unió al pedido ${pedidoId}`);
+    console.log("Rooms actuales:", socket.rooms);
   });
 
   socket.on("disconnect", () => {

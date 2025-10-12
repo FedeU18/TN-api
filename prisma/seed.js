@@ -6,17 +6,17 @@ const prisma = new PrismaClient();
 async function main() {
   console.log("🌱 Iniciando seed extendido...");
 
-  await prisma.pedido.deleteMany({});
   await prisma.notificacion.deleteMany({});
+  await prisma.pedido.deleteMany({});
   await prisma.usuario.deleteMany({});
   await prisma.estadoPedido.deleteMany({});
   await prisma.tipoNotificacion.deleteMany({});
-  
+
   const hashedPassword = await bcrypt.hash("password!123", 10);
   const hashedAdminPassword = await bcrypt.hash("admin!123", 10);
 
   // === Usuarios ===
- 
+
   // Clientes - se usa create() porque necesitamos sus IDs para los pedidos
   const cliente1 = await prisma.usuario.create({
     data: {
@@ -137,7 +137,7 @@ async function main() {
       rol: "admin",
     },
   });
-  
+
   // === Estados de pedido ===
   const pendiente = await prisma.estadoPedido.upsert({
     where: { nombre_estado: "Pendiente" },
@@ -159,7 +159,6 @@ async function main() {
     update: {},
     create: { nombre_estado: "Entregado" },
   });
-
 
   // === Pedidos ===
   const pedidos = await prisma.pedido.createMany({
@@ -208,7 +207,6 @@ async function main() {
       },
     ],
   });
-  
 
   // === Tipos de notificación ===
   const tipoNuevo = await prisma.tipoNotificacion.upsert({

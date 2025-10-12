@@ -1,5 +1,4 @@
 import prisma from "../lib/prisma.js";
-import { io } from "../index.js";
 
 export const getAllPedidos = async (req, res) => {
   try {
@@ -11,11 +10,9 @@ export const getAllPedidos = async (req, res) => {
     });
 
     if (!admin || admin.rol.toLowerCase() !== "admin") {
-      return res
-        .status(403)
-        .json({
-          message: "Solo los administradores pueden ver todos los pedidos",
-        });
+      return res.status(403).json({
+        message: "Solo los administradores pueden ver todos los pedidos",
+      });
     }
 
     // Obtener todos los pedidos
@@ -187,10 +184,12 @@ export const tomarPedido = async (req, res) => {
     }
 
     //Emitir actualización en tiempo real
-    io.to(`pedido_${pedidoActualizado.id_pedido}`).emit("estadoActualizado", {
-      pedidoId: pedidoActualizado.id_pedido,
-      nuevoEstado: pedidoActualizado.estado.nombre_estado,
-    });
+    req.io
+      .to(`pedido_${pedidoActualizado.id_pedido}`)
+      .emit("estadoActualizado", {
+        pedidoId: pedidoActualizado.id_pedido,
+        nuevoEstado: pedidoActualizado.estado.nombre_estado,
+      });
 
     res.json({
       message: "Pedido tomado correctamente",
@@ -284,10 +283,12 @@ export const asignarPedido = async (req, res) => {
     }
 
     //Emitir actualización en tiempo real
-    io.to(`pedido_${pedidoActualizado.id_pedido}`).emit("estadoActualizado", {
-      pedidoId: pedidoActualizado.id_pedido,
-      nuevoEstado: pedidoActualizado.estado.nombre_estado,
-    });
+    req.io
+      .to(`pedido_${pedidoActualizado.id_pedido}`)
+      .emit("estadoActualizado", {
+        pedidoId: pedidoActualizado.id_pedido,
+        nuevoEstado: pedidoActualizado.estado.nombre_estado,
+      });
 
     res.json({
       message: "Pedido asignado correctamente",
@@ -349,7 +350,7 @@ export const actualizarEstadoPedido = async (req, res) => {
     });
 
     //Emitir actualización por Socket.IO
-    io.to(`pedido_${id}`).emit("estadoActualizado", {
+    req.io.to(`pedido_${id}`).emit("estadoActualizado", {
       pedidoId: pedidoActualizado.id_pedido,
       nuevoEstado: pedidoActualizado.estado.nombre_estado,
     });
