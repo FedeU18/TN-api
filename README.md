@@ -23,7 +23,7 @@
 - monitorear estado de pedido: GET http://localhost:3000/api/pedidos/monitor/:id
 - actualizar estado de pedido: PUT http://localhost:3000/api/pedidos/estado/:id
 - obtener pedidos asignados a un repartidor: GET http://localhost:3000/api/pedidos/estado/mis-pedidos
-- obtener pedidos asignados a un repartidor: GET http://localhost:3000/api/pedidos/estado/mis-pedidos
+- obtener ubicacion del repartidor: GET http://localhost:3000/api/pedidos/estado/mis-pedidos
 
 ## Cliente
 
