@@ -161,6 +161,12 @@ async function main() {
     create: { nombre_estado: "Entregado" },
   });
 
+  const cancelado = await prisma.estadoPedido.upsert({
+    where: { nombre_estado: "Cancelado" },
+    update: {},
+    create: { nombre_estado: "Cancelado" },
+  });
+
   // === Pedidos ===
   await prisma.pedido.createMany({
     data: [
