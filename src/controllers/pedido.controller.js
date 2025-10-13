@@ -366,6 +366,7 @@ export const actualizarEstadoPedido = async (req, res) => {
     res.status(500).json({ message: "Error al actualizar estado del pedido" });
   }
 };
+
 export const obtenerUbicacionRepartidor = async (req, res) => {
   const { id } = req.params;
 
@@ -410,6 +411,64 @@ export const obtenerUbicacionRepartidor = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error al obtener ubicación:", error);
+    res.status(500).json({ message: "Error interno del servidor" });
+  }
+};
+
+export const guardarUbicacionRepartidor = async (req, res) => {
+  const { id } = req.params;
+  const { latitud, longitud, precision, timestamp } = req.body;
+  const repartidorId = req.user.id_usuario;
+
+  try {
+    // Validar que el pedido esté asignado al repartidor
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(id) },
+    });
+
+    if (!pedido || pedido.id_repartidor !== repartidorId) {
+      return res.status(403).json({ message: "No autorizado para actualizar la ubicación de este pedido" });
+    }
+
+    // Obtener tipo de ubicación "Actual"
+    const tipoUbicacion = await prisma.tipoUbicacion.findFirst({
+      where: { nombre_estado: "Actual" },
+    });
+
+    if (!tipoUbicacion) {
+      return res.status(500).json({ message: "Tipo de ubicación 'Actual' no existe" });
+    }
+
+    // Guardar ubicación
+    const ubicacion = await prisma.ubicacion.create({
+      data: {
+        id_pedido: Number(id),
+        id_tipo: tipoUbicacion.id_estado,
+        latitud: parseFloat(latitud),
+        longitud: parseFloat(longitud),
+        fecha_registro: new Date(timestamp),
+      },
+    });
+
+    // Emitir ubicación en tiempo real
+    req.io.to(`pedido_${id}`).emit("ubicacionActualizada", {
+      pedidoId: Number(id),
+      latitud: ubicacion.latitud,
+      longitud: ubicacion.longitud,
+      timestamp: ubicacion.fecha_registro,
+
+    });
+
+    res.json({
+      message: "Ubicación guardada correctamente",
+      ubicacion: {
+        latitud: ubicacion.latitud,
+        longitud: ubicacion.longitud,
+        timestamp: ubicacion.fecha_registro,
+      }
+    });
+  } catch (error) {
+    console.error("Error al guardar ubicación:", error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };

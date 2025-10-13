@@ -8,6 +8,7 @@ import {
   actualizarEstadoPedido,
   getAllPedidos,
   obtenerUbicacionRepartidor,
+  guardarUbicacionRepartidor,
 } from "../controllers/pedido.controller.js";
 import verifyJWT from "../middlewares/jwt.js";
 
@@ -22,5 +23,6 @@ router.put("/asignar/:id", verifyJWT, asignarPedido);
 router.get("/monitor/:id", verifyJWT, monitorPedido);
 router.put("/estado/:id", verifyJWT, actualizarEstadoPedido);
 router.get("/:id/ubicacion", verifyJWT, obtenerUbicacionRepartidor);
+router.post("/:id/ubicacion", verifyJWT, guardarUbicacionRepartidor);
 
 export default router;
