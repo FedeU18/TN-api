@@ -24,6 +24,7 @@ export const getAllPedidos = async (req, res) => {
             nombre: true,
             apellido: true,
             email: true,
+            telefono: true,
           },
         },
         repartidor: {
@@ -32,6 +33,7 @@ export const getAllPedidos = async (req, res) => {
             nombre: true,
             apellido: true,
             email: true,
+            telefono: true,
           },
         },
         estado: {
