@@ -63,7 +63,7 @@ export const obtenerDetallePedidoCliente = async (req, res) => {
         },
         ubicaciones: {
           include: {
-            tipo: { select: { nombre_estado: true } },
+            tipo: { select: { nombre_tipo: true } },
           },
           orderBy: { id_ubicacion: "asc" },
         },

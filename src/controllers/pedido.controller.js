@@ -380,7 +380,7 @@ export const obtenerUbicacionRepartidor = async (req, res) => {
     }
 
     const tipoUbicacion = await prisma.tipoUbicacion.findFirst({
-      where: { nombre_estado: "Actual" },
+      where: { nombre_tipo: "Actual" },
     });
 
     if (!tipoUbicacion) {
@@ -392,7 +392,7 @@ export const obtenerUbicacionRepartidor = async (req, res) => {
     const ubicacion = await prisma.ubicacion.findFirst({
       where: {
         id_pedido: Number(id),
-        id_tipo: tipoUbicacion.id_estado,
+        id_tipo: tipoUbicacion.id_tipo,
       },
       orderBy: { id_ubicacion: "desc" }, // por si tenés historial
     });
@@ -421,25 +421,35 @@ export const guardarUbicacionRepartidor = async (req, res) => {
   const repartidorId = req.user.id_usuario;
 
   try {
-    console.log(`[guardarUbicacionRepartidor] INICIO - pedidoId: ${id}, repartidorId: ${repartidorId}`);
+    console.log(
+      `[guardarUbicacionRepartidor] INICIO - pedidoId: ${id}, repartidorId: ${repartidorId}`
+    );
     // Validar que el pedido esté asignado al repartidor
     const pedido = await prisma.pedido.findUnique({
       where: { id_pedido: Number(id) },
     });
-    console.log('[guardarUbicacionRepartidor] Pedido encontrado:', !!pedido);
+    console.log("[guardarUbicacionRepartidor] Pedido encontrado:", !!pedido);
     if (!pedido || pedido.id_repartidor !== repartidorId) {
-      console.log('[guardarUbicacionRepartidor] Pedido no autorizado para este repartidor');
-      return res.status(403).json({ message: "No autorizado para actualizar la ubicación de este pedido" });
+      console.log(
+        "[guardarUbicacionRepartidor] Pedido no autorizado para este repartidor"
+      );
+      return res.status(403).json({
+        message: "No autorizado para actualizar la ubicación de este pedido",
+      });
     }
 
     // Obtener tipo de ubicación "Actual"
     const tipoUbicacion = await prisma.tipoUbicacion.findFirst({
-      where: { nombre_estado: "Actual" },
+      where: { nombre_tipo: "Actual" },
     });
-    console.log('[guardarUbicacionRepartidor] tipoUbicacion:', tipoUbicacion);
+    console.log("[guardarUbicacionRepartidor] tipoUbicacion:", tipoUbicacion);
     if (!tipoUbicacion) {
-      console.log('[guardarUbicacionRepartidor] No existe el tipo de ubicación Actual');
-      return res.status(500).json({ message: "Tipo de ubicación 'Actual' no existe" });
+      console.log(
+        "[guardarUbicacionRepartidor] No existe el tipo de ubicación Actual"
+      );
+      return res
+        .status(500)
+        .json({ message: "Tipo de ubicación 'Actual' no existe" });
     }
 
     // Guardar ubicación
@@ -449,7 +459,7 @@ export const guardarUbicacionRepartidor = async (req, res) => {
         where: {
           id_pedido_id_tipo: {
             id_pedido: Number(id),
-            id_tipo: tipoUbicacion.id_estado,
+            id_tipo: tipoUbicacion.id_tipo,
           },
         },
         update: {
@@ -459,15 +469,21 @@ export const guardarUbicacionRepartidor = async (req, res) => {
         },
         create: {
           id_pedido: Number(id),
-          id_tipo: tipoUbicacion.id_estado,
+          id_tipo: tipoUbicacion.id_tipo,
           latitud: parseFloat(latitud),
           longitud: parseFloat(longitud),
           fecha_registro: new Date(timestamp),
         },
       });
-      console.log('[guardarUbicacionRepartidor] Ubicación guardada:', ubicacion);
+      console.log(
+        "[guardarUbicacionRepartidor] Ubicación guardada:",
+        ubicacion
+      );
     } catch (errUbicacion) {
-      console.error('[guardarUbicacionRepartidor] Error al guardar ubicación:', errUbicacion);
+      console.error(
+        "[guardarUbicacionRepartidor] Error al guardar ubicación:",
+        errUbicacion
+      );
       throw errUbicacion;
     }
 
@@ -479,9 +495,12 @@ export const guardarUbicacionRepartidor = async (req, res) => {
         longitud: ubicacion.longitud,
         timestamp: ubicacion.fecha_registro,
       });
-      console.log('[guardarUbicacionRepartidor] Evento emitido por socket');
+      console.log("[guardarUbicacionRepartidor] Evento emitido por socket");
     } catch (errSocket) {
-      console.error('[guardarUbicacionRepartidor] Error al emitir evento socket:', errSocket);
+      console.error(
+        "[guardarUbicacionRepartidor] Error al emitir evento socket:",
+        errSocket
+      );
       // No lanzar error, solo loguear
     }
 
@@ -491,11 +510,11 @@ export const guardarUbicacionRepartidor = async (req, res) => {
         latitud: ubicacion.latitud,
         longitud: ubicacion.longitud,
         timestamp: ubicacion.fecha_registro,
-      }
+      },
     });
-    console.log('[guardarUbicacionRepartidor] FIN OK');
+    console.log("[guardarUbicacionRepartidor] FIN OK");
   } catch (error) {
-    console.error('[guardarUbicacionRepartidor] ERROR GENERAL:', error);
+    console.error("[guardarUbicacionRepartidor] ERROR GENERAL:", error);
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };

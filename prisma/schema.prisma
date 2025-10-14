@@ -49,8 +49,12 @@ model Pedido {
   id_pedido      Int           @id @default(autoincrement())
   id_cliente     Int
   id_repartidor  Int?
-  direccion_origen  String
-  direccion_destino String
+  direccion_origen   String
+  direccion_destino  String
+  origen_latitud     Decimal?  @db.Decimal(10,7)
+  origen_longitud    Decimal?  @db.Decimal(10,7)
+  destino_latitud    Decimal?  @db.Decimal(10,7)
+  destino_longitud   Decimal?  @db.Decimal(10,7)
   id_estado      Int
   fecha_creacion DateTime      @default(now())
   fecha_entrega  DateTime?
@@ -65,10 +69,9 @@ model Pedido {
 }
 
 model TipoUbicacion {
-  id_estado     Int       @id @default(autoincrement())
-  nombre_estado String    @unique
-
-  ubicaciones   Ubicacion[]
+  id_tipo      Int       @id @default(autoincrement())
+  nombre_tipo  String    @unique
+  ubicaciones  Ubicacion[]
 }
 
 model Ubicacion {
@@ -80,8 +83,7 @@ model Ubicacion {
   fecha_registro DateTime @default(now()) // <-- AGREGAR ESTA LÍNEA
 
   pedido Pedido @relation(fields: [id_pedido], references: [id_pedido])
-  tipo   TipoUbicacion @relation(fields: [id_tipo], references: [id_estado])
-
+  tipo   TipoUbicacion @relation(fields: [id_tipo], references: [id_tipo])
   @@unique([id_pedido, id_tipo])
 }
 

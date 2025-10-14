@@ -1,5 +1,4 @@
 import prisma from "../lib/prisma.js";
-import { io } from "../index.js";
 
 export const enviarUbicacion = async (req, res) => {
   try {
@@ -39,7 +38,7 @@ export const enviarUbicacion = async (req, res) => {
 
     // Buscar tipo de ubicación "Actual"
     const tipoUbicacion = await prisma.tipoUbicacion.findFirst({
-      where: { nombre_estado: "Actual" },
+      where: { nombre_tipo: "Actual" },
     });
 
     if (!tipoUbicacion) {
@@ -53,7 +52,7 @@ export const enviarUbicacion = async (req, res) => {
       where: {
         id_pedido_id_tipo: {
           id_pedido: Number(id_pedido),
-          id_tipo: tipoUbicacion.id_estado,
+          id_tipo: tipoUbicacion.id_tipo,
         },
       },
       update: {
@@ -62,14 +61,14 @@ export const enviarUbicacion = async (req, res) => {
       },
       create: {
         id_pedido: Number(id_pedido),
-        id_tipo: tipoUbicacion.id_estado,
+        id_tipo: tipoUbicacion.id_tipo,
         latitud: parseFloat(latitud),
         longitud: parseFloat(longitud),
       },
     });
 
     // Emitir evento en tiempo real
-    io.to(`pedido_${id_pedido}`).emit("ubicacionRepartidor", {
+    req.io.to(`pedido_${id_pedido}`).emit("ubicacionRepartidor", {
       pedidoId: id_pedido,
       latitud: ubicacion.latitud,
       longitud: ubicacion.longitud,

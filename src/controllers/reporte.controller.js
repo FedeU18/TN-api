@@ -33,7 +33,7 @@ export const getReporteDesempeno = async (req, res) => {
           entregados: 0,
           pendientes: 0,
           cancelados: 0,
-          promedio_entrega_horas: 0,
+          promedio_entrega_minutos: 0,
         },
       });
     }
@@ -49,10 +49,10 @@ export const getReporteDesempeno = async (req, res) => {
       if (estado === "entregado") {
         entregados++;
         if (pedido.fecha_entrega) {
-          const horas =
+          const minutos =
             (new Date(pedido.fecha_entrega) - new Date(pedido.fecha_creacion)) /
-            (1000 * 60 * 60);
-          tiemposEntrega.push(horas);
+            (1000 * 60);
+          tiemposEntrega.push(minutos);
         }
       } else if (["pendiente", "asignado"].includes(estado)) {
         pendientes++;
@@ -108,10 +108,10 @@ export const getReporteDesempeno = async (req, res) => {
           select: { fecha_creacion: true, fecha_entrega: true },
         });
 
-        const horas = pedidosEntregados.map(
+        const minutos = pedidosEntregados.map(
           (p) =>
             (new Date(p.fecha_entrega) - new Date(p.fecha_creacion)) /
-            (1000 * 60 * 60)
+            (1000 * 60)
         );
 
         return {
@@ -122,23 +122,28 @@ export const getReporteDesempeno = async (req, res) => {
           total_pedidos: rep._count.id_pedido,
           entregados,
           cancelados,
-          promedio_horas_entrega:
-            horas.length > 0
-              ? (horas.reduce((a, b) => a + b, 0) / horas.length).toFixed(2)
+          promedio_minutos_entrega:
+            minutos.length > 0
+              ? (minutos.reduce((a, b) => a + b, 0) / minutos.length).toFixed(2)
               : 0,
         };
       })
     );
 
-    // 5️⃣ Respuesta
+    // 5️⃣ Series por fecha
     const series = [];
-
     const pedidosPorFecha = {};
 
     for (const pedido of pedidos) {
       const fecha = new Date(pedido.fecha_creacion).toISOString().split("T")[0];
       if (!pedidosPorFecha[fecha]) {
-        pedidosPorFecha[fecha] = { fecha, entregados: 0, cancelados: 0, tiempoPromedio: 0, count: 0 };
+        pedidosPorFecha[fecha] = {
+          fecha,
+          entregados: 0,
+          cancelados: 0,
+          tiempoPromedio: 0,
+          count: 0,
+        };
       }
 
       const estado = pedido.estado.nombre_estado.toLowerCase();
@@ -146,24 +151,23 @@ export const getReporteDesempeno = async (req, res) => {
       if (estado === "cancelado") pedidosPorFecha[fecha].cancelados++;
 
       if (pedido.fecha_entrega) {
-        const horas =
-          (new Date(pedido.fecha_entrega) - new Date(pedido.fecha_creacion)) / (1000 * 60 * 60);
-        pedidosPorFecha[fecha].tiempoPromedio += horas;
+        const minutos =
+          (new Date(pedido.fecha_entrega) - new Date(pedido.fecha_creacion)) /
+          (1000 * 60);
+        pedidosPorFecha[fecha].tiempoPromedio += minutos;
         pedidosPorFecha[fecha].count++;
       }
     }
 
-    //promediar los tiempos
     for (const fecha in pedidosPorFecha) {
       const d = pedidosPorFecha[fecha];
-      d.tiempoPromedio = d.count > 0
-        ? ((d.tiempoPromedio / d.count) * 60).toFixed(2)
-        : 0;
+      d.tiempoPromedio =
+        d.count > 0 ? (d.tiempoPromedio / d.count).toFixed(2) : 0;
       series.push({
         fecha: d.fecha,
         entregados: d.entregados,
         cancelados: d.cancelados,
-        tiempoPromedio: d.tiempoPromedio,
+        tiempoPromedio: d.tiempoPromedio, // ya en minutos
       });
     }
 
@@ -173,7 +177,7 @@ export const getReporteDesempeno = async (req, res) => {
         entregados,
         pendientes,
         cancelados,
-        promedio_entrega_horas: promedioEntrega > 0 ? (promedioEntrega * 60).toFixed(2) : 0,
+        promedio_entrega_minutos: promedioEntrega,
       },
       detalle_repartidores: detalleRepartidores,
       series,
