@@ -12,6 +12,7 @@ import adminRoutes from "./routes/admin.routes.js";
 import errorHandler from "./middlewares/errorHandler.js";
 import repartidorRoutes from "./routes/repartidor.routes.js";
 import clienteRoutes from "./routes/cliente.routes.js";
+import soapWrapperRoutes from "./routes/soapWrapper.routes.js";
 
 dotenv.config();
 
@@ -45,6 +46,7 @@ app.use("/api/pedidos", pedidoRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/repartidores", repartidorRoutes);
 app.use("/api/clientes", clienteRoutes);
+app.use("/api/soap-wrapper", soapWrapperRoutes);
 
 // Manejo de errores
 app.use(errorHandler);

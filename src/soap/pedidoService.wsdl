@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions xmlns="http://schemas.xmlsoap.org/wsdl/" 
+						 xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" 
+						 xmlns:tns="http://tn-api/soap" 
+						 xmlns:xsd="http://www.w3.org/2001/XMLSchema" 
+						 targetNamespace="http://tn-api/soap">
+
+	<types>
+		<xsd:schema targetNamespace="http://tn-api/soap">
+			<xsd:element name="getPedidosPorEmailRequest">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="email" type="xsd:string"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:element name="getPedidosPorEmailResponse">
+				<xsd:complexType>
+					<xsd:sequence>
+						<xsd:element name="pedidos" type="tns:PedidosArray"/>
+					</xsd:sequence>
+				</xsd:complexType>
+			</xsd:element>
+			<xsd:complexType name="Pedido">
+				<xsd:sequence>
+					<xsd:element name="id" type="xsd:int"/>
+					<xsd:element name="estado" type="xsd:string"/>
+					<xsd:element name="fecha" type="xsd:string"/>
+					<xsd:element name="direccion_origen" type="xsd:string"/>
+					<xsd:element name="direccion_destino" type="xsd:string"/>
+				</xsd:sequence>
+			</xsd:complexType>
+			<xsd:complexType name="PedidosArray">
+				<xsd:sequence>
+					<xsd:element name="pedido" type="tns:Pedido" minOccurs="0" maxOccurs="unbounded"/>
+				</xsd:sequence>
+			</xsd:complexType>
+		</xsd:schema>
+	</types>
+
+	<message name="getPedidosPorEmailRequest">
+		<part name="parameters" element="tns:getPedidosPorEmailRequest"/>
+	</message>
+	<message name="getPedidosPorEmailResponse">
+		<part name="parameters" element="tns:getPedidosPorEmailResponse"/>
+	</message>
+
+	<portType name="PedidoPortType">
+		<operation name="getPedidosPorEmail">
+			<input message="tns:getPedidosPorEmailRequest"/>
+			<output message="tns:getPedidosPorEmailResponse"/>
+		</operation>
+	</portType>
+
+	<binding name="PedidoBinding" type="tns:PedidoPortType">
+		<soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+		<operation name="getPedidosPorEmail">
+			<soap:operation soapAction="getPedidosPorEmail"/>
+			<input>
+				<soap:body use="literal"/>
+			</input>
+			<output>
+				<soap:body use="literal"/>
+			</output>
+		</operation>
+	</binding>
+
+	<service name="PedidoService">
+		<port name="PedidoPort" binding="tns:PedidoBinding">
+			<soap:address location="http://localhost:8001/wsdl"/>
+		</port>
+	</service>
+
+</definitions>
