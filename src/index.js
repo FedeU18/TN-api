@@ -48,6 +48,99 @@ app.use("/api/repartidores", repartidorRoutes);
 app.use("/api/clientes", clienteRoutes);
 app.use("/api/soap-wrapper", soapWrapperRoutes);
 
+// Proxy para el WSDL y manejo de preflight a través del servidor Express principal
+// para evitar bloqueos por CORS desde el navegador
+app.options('/wsdl', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, SOAPAction');
+  return res.sendStatus(204);
+});
+
+app.get('/wsdl', (req, res) => {
+  // Reenviar la petición al servidor SOAP interno
+  const path = req.originalUrl; // includes query string like ?wsdl
+  const options = {
+    hostname: 'localhost',
+    port: 8001,
+    path,
+    method: 'GET',
+    headers: {
+      'Origin': req.headers.origin || 'http://localhost:3000'
+    }
+  };
+
+    const proxy = http.request(options, (proxyRes) => {
+    res.statusCode = proxyRes.statusCode;
+    // copiar cabeceras del proxy y asegurar CORS
+    Object.entries(proxyRes.headers).forEach(([k, v]) => res.setHeader(k, v));
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    proxyRes.pipe(res);
+  });
+
+  proxy.on('error', (err) => {
+    console.error('Error proxying WSDL:', err.message);
+    res.status(502).json({ error: 'Bad gateway' });
+  });
+
+  proxy.end();
+});
+
+// Aceptar body en bruto para POST SOAP (evitar que express.json() consuma el XML)
+app.post('/wsdl', express.raw({ type: '*/*', limit: '5mb' }), (req, res) => {
+  try {
+  const bodyBuffer = req.body && Buffer.isBuffer(req.body) ? req.body : Buffer.from(req.body || '');
+  const headers = { ...req.headers };
+  // Remove headers that would conflict and set host/content-length correctly
+  delete headers['transfer-encoding'];
+  delete headers['content-encoding'];
+  delete headers['content-length'];
+  headers['host'] = 'localhost:8001';
+  headers['content-length'] = bodyBuffer.length;
+
+    const options = {
+      hostname: 'localhost',
+      port: 8001,
+      path: '/wsdl',
+      method: 'POST',
+      headers,
+    };
+
+  // Reenviar la petición SOAP al servidor interno en el puerto 8001
+    const proxyReq = http.request(options, (proxyRes) => {
+      res.statusCode = proxyRes.statusCode;
+      Object.entries(proxyRes.headers).forEach(([k, v]) => res.setHeader(k, v));
+      res.setHeader('Access-Control-Allow-Origin', '*');
+
+      // If non-success, collect body for debugging
+      if (proxyRes.statusCode >= 400) {
+        let data = '';
+        proxyRes.setEncoding('utf8');
+        proxyRes.on('data', chunk => data += chunk);
+        proxyRes.on('end', () => {
+          // Devuelve el cuerpo de error tal cual para facilitar debugging cuando ocurra
+          console.error('SOAP server error response body:', data);
+          res.end(data);
+        });
+      } else {
+        proxyRes.pipe(res, { end: true });
+      }
+    });
+
+    proxyReq.on('error', (err) => {
+      console.error('Error proxying SOAP POST:', err);
+      if (!res.headersSent) res.status(502).json({ error: 'Bad gateway' });
+    });
+
+    // Write buffer and end
+    proxyReq.write(bodyBuffer);
+    proxyReq.end();
+  } catch (err) {
+    console.error('Exception in /wsdl proxy POST:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 // Manejo de errores
 app.use(errorHandler);
 

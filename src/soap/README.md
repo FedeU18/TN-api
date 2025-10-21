@@ -4,7 +4,7 @@
 Consulta los pedidos asociados a un usuario utilizando su email.
 
 ## Endpoint
-- **WSDL:** `http://localhost:8001/wsdl`
+-- **WSDL:** `http://localhost:3000/wsdl`
 - **Servicio:** `PedidoService`
 - **Método:** `getPedidosPorEmail`
 

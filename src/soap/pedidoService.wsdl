@@ -67,7 +67,7 @@
 
 	<service name="PedidoService">
 		<port name="PedidoPort" binding="tns:PedidoBinding">
-			<soap:address location="http://localhost:8001/wsdl"/>
+				<soap:address location="http://localhost:3000/wsdl"/>
 		</port>
 	</service>
 

@@ -1,7 +1,8 @@
-const express = require('express');
+import express from 'express';
+import * as soapWrapperController from '../controllers/soapWrapper.controller.js';
+
 const router = express.Router();
-const soapWrapperController = require('../controllers/soapWrapper.controller');
 
 router.get('/pedidos', soapWrapperController.getPedidosPorEmail);
 
-module.exports = router;
+export default router;
