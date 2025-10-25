@@ -1,7 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-import nodemailer from "nodemailer";
+import { sendEmail } from "./sendgrid.controller.js";
 
 const prisma = new PrismaClient();
 
@@ -96,25 +96,21 @@ export const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
 
-    const user = await prisma.usuario.findUnique({
-      where: { email },
-    });
-
+    //verificar si existe el user
+    const user = await prisma.usuario.findUnique({ where: { email } });
     if (!user) {
-      return res
-        .status(404)
-        .json({ message: "No existe un usuario con ese email" });
+      return res.status(404).json({ message: "No existe un usuario con ese email" });
     }
 
-    //Generar token seguro
+    //generar token de recuperación (expira en 15 minutos)
     const resetToken = jwt.sign(
       { id: user.id_usuario, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "15m" }
     );
-    //expira en 15 minutos
     const resetTokenExpires = new Date(Date.now() + 1000 * 60 * 15);
 
+    //guardar token y fecha de expiracion en la bd
     await prisma.usuario.update({
       where: { email },
       data: {
@@ -123,40 +119,26 @@ export const forgotPassword = async (req, res) => {
       },
     });
 
-    //inicio configuración de nodemailer
-    const transporter = nodemailer.createTransport({
-      service: "Gmail",
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
-      },
-    });
-    //Estructura del mail y a quien va dirigido
-    const mailOptions = {
-      from: process.env.EMAIL_USER,
+    //enviar email usando SendGrid
+    await sendEmail({
       to: email,
       subject: "Recuperación de contraseña",
       text: `
         Copia el siguiente token para restablecer tu contraseña. Este token es válido por 15 minutos.
-        
+
         Token: ${resetToken}
-        
+
         Si no solicitaste este cambio, puedes ignorar este correo.
       `,
-    };
-    //Enviar email
-    transporter.sendMail(mailOptions, (error, info) => {
-      if (error) {
-        console.error("Error al enviar el email:", error);
-      } else {
-        return res.status(200).json({
-          message: "Se envió un enlace de recuperación al correo registrado",
-          token: resetToken,
-        });
-      }
     });
+
+    return res.status(200).json({
+      message: "Se envió un enlace de recuperación al correo registrado",
+      token: resetToken,
+    });
+
   } catch (error) {
-    console.error("Error en forgotPassword:", error);
+    console.error("Error en forgotPassword con SendGrid:", error);
     return res.status(500).json({ message: "Error al recuperar contraseña" });
   }
 };
