@@ -1,5 +1,8 @@
 import prisma from "../lib/prisma.js";
+import crypto from "crypto";
+import { generateQRCode } from "../utils/generateQRCode.js";
 
+//Obtener todos los pedidos (solo para admins)
 export const getAllPedidos = async (req, res) => {
   try {
     const userId = req.user.id_usuario;
@@ -336,22 +339,84 @@ export const monitorPedido = async (req, res) => {
 //Actualizar estado de un pedido (En camino, Entregado, etc.)
 export const actualizarEstadoPedido = async (req, res) => {
   const { id } = req.params;
-  const { nuevoEstado } = req.body;
+  const { nuevoEstado, qr_token } = req.body; // ahora puede venir el qr_token opcionalmente
+  const usuarioId = req.user.id_usuario;
 
   try {
-    const estado = await prisma.estadoPedido.findFirst({
-      where: { nombre_estado: nuevoEstado },
-    });
-
-    if (!estado) return res.status(400).json({ message: "Estado no válido" });
-
-    const pedidoActualizado = await prisma.pedido.update({
+    const pedido = await prisma.pedido.findUnique({
       where: { id_pedido: Number(id) },
-      data: { id_estado: estado.id_estado },
       include: { estado: true, cliente: true, repartidor: true },
     });
 
-    //Emitir actualización por Socket.IO
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    // Validar que el nuevo estado exista
+    const estadoDestino = await prisma.estadoPedido.findFirst({
+      where: { nombre_estado: nuevoEstado },
+    });
+
+    if (!estadoDestino) {
+      return res.status(400).json({ message: "Estado no válido" });
+    }
+
+    // 🧠 Caso especial: si el estado es "Entregado", verificar QR
+    if (nuevoEstado === "Entregado") {
+      // Solo el repartidor asignado puede marcar como entregado
+      if (pedido.id_repartidor !== usuarioId) {
+        return res
+          .status(403)
+          .json({ message: "No autorizado para entregar este pedido" });
+      }
+
+      // Validar que haya un QR y que el token coincida
+      if (!pedido.qr_token) {
+        return res
+          .status(400)
+          .json({ message: "El pedido no tiene un QR asociado" });
+      }
+
+      if (!qr_token) {
+        return res.status(400).json({
+          message: "Debe enviarse el token del QR para entregar el pedido",
+        });
+      }
+
+      if (pedido.qr_token !== qr_token) {
+        return res
+          .status(401)
+          .json({ message: "Token QR inválido o expirado" });
+      }
+    }
+
+    // 📦 Si el pedido pasa a "En camino", generar QR
+    let dataToUpdate = { id_estado: estadoDestino.id_estado };
+
+    if (nuevoEstado === "En camino") {
+      const token = crypto.randomBytes(16).toString("hex");
+      const qrBase64 = await generateQRCode(id, token);
+
+      if (qrBase64) {
+        dataToUpdate.qr_codigo = qrBase64;
+        dataToUpdate.qr_token = token;
+      }
+    }
+
+    // ♻️ Si fue entregado correctamente, limpiar QR
+    if (nuevoEstado === "Entregado") {
+      dataToUpdate.qr_token = null;
+      dataToUpdate.qr_codigo = null;
+    }
+
+    // Actualizar pedido
+    const pedidoActualizado = await prisma.pedido.update({
+      where: { id_pedido: Number(id) },
+      data: dataToUpdate,
+      include: { estado: true, cliente: true, repartidor: true },
+    });
+
+    // Emitir actualización en tiempo real
     req.io.to(`pedido_${id}`).emit("estadoActualizado", {
       pedidoId: pedidoActualizado.id_pedido,
       nuevoEstado: pedidoActualizado.estado.nombre_estado,
@@ -362,8 +427,70 @@ export const actualizarEstadoPedido = async (req, res) => {
       pedido: pedidoActualizado,
     });
   } catch (error) {
-    console.error(error);
+    console.error("❌ Error en actualizarEstadoPedido:", error);
     res.status(500).json({ message: "Error al actualizar estado del pedido" });
+  }
+};
+
+export const obtenerQR = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(id) },
+      select: { qr_codigo: true },
+    });
+
+    if (!pedido || !pedido.qr_codigo) {
+      return res
+        .status(404)
+        .json({ message: "QR no disponible para este pedido" });
+    }
+
+    res.json({ qrBase64: pedido.qr_codigo });
+  } catch (error) {
+    console.error("Error al obtener QR:", error);
+    res.status(500).json({ message: "Error al obtener QR" });
+  }
+};
+
+export const verificarQR = async (req, res) => {
+  const { id } = req.params;
+  const { token } = req.query;
+
+  try {
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(id) },
+      include: { cliente: true, repartidor: true, estado: true },
+    });
+
+    if (!pedido)
+      return res.status(404).json({ message: "Pedido no encontrado" });
+
+    if (!pedido.qr_token) {
+      return res
+        .status(400)
+        .json({ message: "El pedido no tiene un QR asociado" });
+    }
+
+    if (pedido.qr_token !== token) {
+      return res.status(401).json({ message: "QR no válido o expirado" });
+    }
+
+    res.json({
+      message: "✅ QR verificado correctamente",
+      pedido: {
+        id_pedido: pedido.id_pedido,
+        estado: pedido.estado.nombre_estado,
+        cliente: `${pedido.cliente.nombre} ${pedido.cliente.apellido}`,
+        repartidor: pedido.repartidor
+          ? `${pedido.repartidor.nombre} ${pedido.repartidor.apellido}`
+          : null,
+      },
+    });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error al verificar QR" });
   }
 };
 

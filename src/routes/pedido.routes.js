@@ -9,6 +9,8 @@ import {
   getAllPedidos,
   obtenerUbicacionRepartidor,
   guardarUbicacionRepartidor,
+  verificarQR,
+  obtenerQR,
 } from "../controllers/pedido.controller.js";
 import verifyJWT from "../middlewares/jwt.js";
 
@@ -24,5 +26,7 @@ router.get("/monitor/:id", verifyJWT, monitorPedido);
 router.put("/estado/:id", verifyJWT, actualizarEstadoPedido);
 router.get("/:id/ubicacion", verifyJWT, obtenerUbicacionRepartidor);
 router.post("/:id/ubicacion", verifyJWT, guardarUbicacionRepartidor);
+router.get("/verificar-qr/:id", verificarQR);
+router.get("/:id/qr", obtenerQR);
 
 export default router;

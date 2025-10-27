@@ -59,6 +59,7 @@ model Pedido {
   fecha_creacion DateTime      @default(now())
   fecha_entrega  DateTime?
   qr_codigo      String
+  qr_token       String?       // 👈 Agregado aquí
 
   cliente        Usuario       @relation("ClientePedidos", fields: [id_cliente], references: [id_usuario])
   repartidor     Usuario?      @relation("RepartidorPedidos", fields: [id_repartidor], references: [id_usuario])
