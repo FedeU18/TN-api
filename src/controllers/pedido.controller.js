@@ -442,7 +442,23 @@ export const actualizarEstadoPedido = async (req, res) => {
       req.io.to(`pedido_${id}`).emit("estadoActualizado", {
         pedidoId: pedidoActualizado.id_pedido,
         nuevoEstado: pedidoActualizado.estado.nombre_estado,
+        mensaje: `Tu pedido #${pedidoActualizado.id_pedido} cambió a estado "${pedidoActualizado.estado.nombre_estado}"`,
       });
+
+      try {
+        await sendEmail({
+          to: pedidoActualizado.cliente.email,
+          subject: `Actualización de tu pedido #${pedidoActualizado.id_pedido}`,
+          html: `
+            <p>Hola ${pedidoActualizado.cliente.nombre},</p>
+            <p>Tu pedido <b>#${pedidoActualizado.id_pedido}</b> cambió al estado <b>${pedidoActualizado.estado.nombre_estado}</b>.</p>
+            <p>Podés ver los detalles en la aplicación.</p>
+            <p>Gracias por usar nuestro servicio ❤️</p>
+          `,
+        });
+      } catch (emailError) {
+        console.error("Error al enviar email de cambio de estado:", emailError);
+      }
     }
 
     res.json({
@@ -643,6 +659,7 @@ export const guardarUbicacionRepartidor = async (req, res) => {
     // Emitir ubicación en tiempo real
     try {
       req.io.to(`pedido_${id}`).emit("ubicacionActualizada", {
+        
         pedidoId: Number(id),
         latitud: ubicacion.latitud,
         longitud: ubicacion.longitud,
