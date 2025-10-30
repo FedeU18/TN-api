@@ -135,3 +135,78 @@ export const obtenerUbicacion = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
+
+export const calificarRepartidor = async (req, res) => {
+  try {
+    const { pedidoId, puntuacion, comentario } = req.body;
+    const clienteId = req.user.id_usuario;
+
+    // Validaciones iniciales
+    if (!pedidoId || !puntuacion || !comentario) {
+      return res.status(400).json({
+        message:
+          "Faltan datos obligatorios: pedidoId, puntuacion o comentario.",
+      });
+    }
+
+    // Buscar pedido y validar pertenencia
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: Number(pedidoId) },
+      include: {
+        estado: true,
+      },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado." });
+    }
+
+    // Verificar que el pedido pertenezca al cliente autenticado
+    if (pedido.id_cliente !== clienteId) {
+      return res
+        .status(403)
+        .json({
+          message: "No puedes calificar un pedido que no te pertenece.",
+        });
+    }
+
+    // Verificar que el pedido esté entregado
+    const estadoEntregado =
+      pedido.estado.nombre_estado.toLowerCase() === "entregado";
+    if (!estadoEntregado) {
+      return res
+        .status(400)
+        .json({ message: "Solo puedes calificar pedidos entregados." });
+    }
+
+    // Verificar si ya existe una calificación
+    const calificacionExistente = await prisma.calificacion.findUnique({
+      where: { id_pedido: Number(pedidoId) },
+    });
+
+    if (calificacionExistente) {
+      return res
+        .status(400)
+        .json({ message: "Este pedido ya fue calificado." });
+    }
+
+    // Crear la calificación
+    const nuevaCalificacion = await prisma.calificacion.create({
+      data: {
+        id_pedido: Number(pedidoId),
+        id_cliente: clienteId,
+        id_repartidor: pedido.id_repartidor,
+        puntuacion: Number(puntuacion),
+        comentario,
+      },
+    });
+
+    res.status(201).json({
+      message: "Calificación registrada correctamente.",
+      calificacion: nuevaCalificacion,
+    });
+  } catch (error) {
+    console.error("Error al calificar repartidor:", error);
+    res.status(500).json({ message: "Error interno del servidor." });
+  }
+};

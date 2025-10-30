@@ -34,3 +34,4 @@
 
 - obtener ubicación del repartidor en un pedido: GET http://localhost:3000/api/repartidores/ubicacion/:id_pedido
 - actualizar ubicación del repartidor en un pedido: PUT http://localhost:3000/api/repartidores/ubicacion
+- Calificar repartidor: POST http://localhost:3000/api/repartidores/calificar

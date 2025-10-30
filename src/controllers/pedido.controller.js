@@ -339,7 +339,7 @@ export const monitorPedido = async (req, res) => {
 //Actualizar estado de un pedido (En camino, Entregado, etc.)
 export const actualizarEstadoPedido = async (req, res) => {
   const { id } = req.params;
-  const { nuevoEstado, qr_token } = req.body; // ahora puede venir el qr_token opcionalmente
+  const { nuevoEstado, qr_token } = req.body;
   const usuarioId = req.user.id_usuario;
 
   try {
@@ -348,29 +348,23 @@ export const actualizarEstadoPedido = async (req, res) => {
       include: { estado: true, cliente: true, repartidor: true },
     });
 
-    if (!pedido) {
+    if (!pedido)
       return res.status(404).json({ message: "Pedido no encontrado" });
-    }
 
-    // Validar que el nuevo estado exista
     const estadoDestino = await prisma.estadoPedido.findFirst({
       where: { nombre_estado: nuevoEstado },
     });
 
-    if (!estadoDestino) {
+    if (!estadoDestino)
       return res.status(400).json({ message: "Estado no válido" });
-    }
 
-    // 🧠 Caso especial: si el estado es "Entregado", verificar QR
     if (nuevoEstado === "Entregado") {
-      // Solo el repartidor asignado puede marcar como entregado
       if (pedido.id_repartidor !== usuarioId) {
         return res
           .status(403)
           .json({ message: "No autorizado para entregar este pedido" });
       }
 
-      // Validar que haya un QR y que el token coincida
       if (!pedido.qr_token) {
         return res
           .status(400)
@@ -378,9 +372,11 @@ export const actualizarEstadoPedido = async (req, res) => {
       }
 
       if (!qr_token) {
-        return res.status(400).json({
-          message: "Debe enviarse el token del QR para entregar el pedido",
-        });
+        return res
+          .status(400)
+          .json({
+            message: "Debe enviarse el token del QR para entregar el pedido",
+          });
       }
 
       if (pedido.qr_token !== qr_token) {
@@ -390,37 +386,39 @@ export const actualizarEstadoPedido = async (req, res) => {
       }
     }
 
-    // 📦 Si el pedido pasa a "En camino", generar QR
-    let dataToUpdate = { id_estado: estadoDestino.id_estado };
+    // Construir dataToUpdate usando el campo escalar id_estado
+    const dataToUpdate = {
+      id_estado: estadoDestino.id_estado,
+    };
 
     if (nuevoEstado === "En camino") {
       const token = crypto.randomBytes(16).toString("hex");
       const qrBase64 = await generateQRCode(id, token);
 
       if (qrBase64) {
-        dataToUpdate.qr_codigo = qrBase64;
+        dataToUpdate.qr_codigo = qrBase64; // Ojo: debe ser nullable en schema si querés setear null luego
         dataToUpdate.qr_token = token;
       }
     }
 
-    // ♻️ Si fue entregado correctamente, limpiar QR
     if (nuevoEstado === "Entregado") {
       dataToUpdate.qr_token = null;
-      dataToUpdate.qr_codigo = null;
+      dataToUpdate.qr_codigo = null; // Requiere qr_codigo?: String? en el schema; si no, usa "" en su lugar
+      dataToUpdate.fecha_entrega = new Date();
     }
 
-    // Actualizar pedido
     const pedidoActualizado = await prisma.pedido.update({
       where: { id_pedido: Number(id) },
       data: dataToUpdate,
       include: { estado: true, cliente: true, repartidor: true },
     });
 
-    // Emitir actualización en tiempo real
-    req.io.to(`pedido_${id}`).emit("estadoActualizado", {
-      pedidoId: pedidoActualizado.id_pedido,
-      nuevoEstado: pedidoActualizado.estado.nombre_estado,
-    });
+    if (req.io) {
+      req.io.to(`pedido_${id}`).emit("estadoActualizado", {
+        pedidoId: pedidoActualizado.id_pedido,
+        nuevoEstado: pedidoActualizado.estado.nombre_estado,
+      });
+    }
 
     res.json({
       message: `Estado del pedido actualizado a ${nuevoEstado}`,
@@ -428,7 +426,10 @@ export const actualizarEstadoPedido = async (req, res) => {
     });
   } catch (error) {
     console.error("❌ Error en actualizarEstadoPedido:", error);
-    res.status(500).json({ message: "Error al actualizar estado del pedido" });
+    res.status(500).json({
+      message: "Error al actualizar estado del pedido",
+      error: error.message,
+    });
   }
 };
 
