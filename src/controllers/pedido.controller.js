@@ -1,6 +1,7 @@
 import prisma from "../lib/prisma.js";
 import crypto from "crypto";
 import { generateQRCode } from "../utils/generateQRCode.js";
+import { sendEmail } from "./sendgrid.controller.js";
 
 //Obtener todos los pedidos (solo para admins)
 export const getAllPedidos = async (req, res) => {
@@ -359,6 +360,30 @@ export const actualizarEstadoPedido = async (req, res) => {
       return res.status(400).json({ message: "Estado no válido" });
 
     if (nuevoEstado === "Entregado") {
+
+      try {
+        // Crear link único al formulario de calificación
+        const linkCalificacion = `${FRONTEND_URL}/calificar?pedidoId=${pedido.id_pedido}`;
+
+        await sendEmail({
+          to: pedido.cliente.email,
+          subject: "¡Tu pedido ha sido entregado!",
+          html: `
+            <p>Hola ${pedido.cliente.nombre},</p>
+            <p>Tu pedido #${pedido.id_pedido} ha sido entregado exitosamente.</p>
+            <p>Nos encantaría saber tu opinión sobre el repartidor que realizó la entrega.</p>
+            <p>
+              <a href="${linkCalificacion}" style="background:#28a745;color:#fff;padding:10px 15px;text-decoration:none;border-radius:5px;">
+                Calificar Repartidor
+              </a>
+            </p>
+            <p>¡Gracias por confiar en nosotros!</p>
+          `,
+        });
+      } catch (mailError) {
+        console.error("Error al enviar mail de calificación:", mailError);
+      }
+
       if (pedido.id_repartidor !== usuarioId) {
         return res
           .status(403)
