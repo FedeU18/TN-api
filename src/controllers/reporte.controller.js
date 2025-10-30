@@ -193,6 +193,7 @@ export const getReporteDesempeno = async (req, res) => {
           cancelados: 0,
           tiempoPromedio: 0,
           count: 0,
+          calificaciones: [],
         };
       }
 
@@ -207,17 +208,28 @@ export const getReporteDesempeno = async (req, res) => {
         pedidosPorFecha[fecha].tiempoPromedio += minutos;
         pedidosPorFecha[fecha].count++;
       }
+
+      if (pedido.calificacion?.puntuacion) {
+        pedidosPorFecha[fecha].calificaciones.push(pedido.calificacion.puntuacion);
+      }
     }
 
     for (const fecha in pedidosPorFecha) {
       const d = pedidosPorFecha[fecha];
-      d.tiempoPromedio =
-        d.count > 0 ? (d.tiempoPromedio / d.count).toFixed(2) : 0;
+      d.tiempoPromedio = d.count > 0 ? (d.tiempoPromedio / d.count).toFixed(2) : 0;
+      const promedioCalificacion =
+        d.calificaciones.length > 0
+          ? (
+              d.calificaciones.reduce((a, b) => a + b, 0) / d.calificaciones.length
+            ).toFixed(2)
+          : 0;
+
       series.push({
         fecha: d.fecha,
         entregados: d.entregados,
         cancelados: d.cancelados,
         tiempoPromedio: d.tiempoPromedio,
+        promedioCalificacion,
       });
     }
 
