@@ -22,6 +22,7 @@ export const getReporteDesempeno = async (req, res) => {
       include: {
         estado: true,
         repartidor: true,
+        calificacion: true, // 👈 relación con Calificacion
       },
     });
 
@@ -35,6 +36,8 @@ export const getReporteDesempeno = async (req, res) => {
           cancelados: 0,
           promedio_entrega_minutos: 0,
         },
+        detalle_repartidores: [],
+        series: [],
       });
     }
 
@@ -43,11 +46,14 @@ export const getReporteDesempeno = async (req, res) => {
     let pendientes = 0;
     let cancelados = 0;
     const tiemposEntrega = [];
+    const calificaciones = [];
 
     for (const pedido of pedidos) {
       const estado = pedido.estado.nombre_estado.toLowerCase();
+
       if (estado === "entregado") {
         entregados++;
+
         if (pedido.fecha_entrega) {
           const minutos =
             (new Date(pedido.fecha_entrega) - new Date(pedido.fecha_creacion)) /
@@ -59,12 +65,23 @@ export const getReporteDesempeno = async (req, res) => {
       } else if (estado === "cancelado") {
         cancelados++;
       }
+
+      if (pedido.calificacion?.puntuacion) {
+        calificaciones.push(pedido.calificacion.puntuacion);
+      }
     }
 
     const promedioEntrega =
       tiemposEntrega.length > 0
         ? (
             tiemposEntrega.reduce((a, b) => a + b, 0) / tiemposEntrega.length
+          ).toFixed(2)
+        : 0;
+
+    const promedioGeneralCalificacion =
+      calificaciones.length > 0
+        ? (
+            calificaciones.reduce((a, b) => a + b, 0) / calificaciones.length
           ).toFixed(2)
         : 0;
 
@@ -99,6 +116,19 @@ export const getReporteDesempeno = async (req, res) => {
           },
         });
 
+        const calificaciones = await prisma.calificacion.findMany({
+          where: { id_repartidor: rep.id_repartidor },
+          select: { puntuacion: true },
+        });
+
+        const promedioCalificacion =
+          calificaciones.length > 0
+            ? (
+                calificaciones.reduce((a, b) => a + b.puntuacion, 0) /
+                calificaciones.length
+              ).toFixed(2)
+            : 0;
+
         const pedidosEntregados = await prisma.pedido.findMany({
           where: {
             id_repartidor: rep.id_repartidor,
@@ -114,6 +144,21 @@ export const getReporteDesempeno = async (req, res) => {
             (1000 * 60)
         );
 
+        const promedioEntregaRep =
+          minutos.length > 0
+            ? (minutos.reduce((a, b) => a + b, 0) / minutos.length).toFixed(2)
+            : 0;
+
+        const porcentajeExito =
+          rep._count.id_pedido > 0
+            ? ((entregados / rep._count.id_pedido) * 100).toFixed(1)
+            : 0;
+
+        const ratioCancelacion =
+          rep._count.id_pedido > 0
+            ? ((cancelados / rep._count.id_pedido) * 100).toFixed(1)
+            : 0;
+
         return {
           id_repartidor: rep.id_repartidor,
           nombre: `${repartidor?.nombre ?? "Desconocido"} ${
@@ -122,12 +167,17 @@ export const getReporteDesempeno = async (req, res) => {
           total_pedidos: rep._count.id_pedido,
           entregados,
           cancelados,
-          promedio_minutos_entrega:
-            minutos.length > 0
-              ? (minutos.reduce((a, b) => a + b, 0) / minutos.length).toFixed(2)
-              : 0,
+          promedio_minutos_entrega: promedioEntregaRep,
+          promedio_calificacion: promedioCalificacion,
+          porcentaje_exito: porcentajeExito,
+          ratio_cancelacion: ratioCancelacion,
         };
       })
+    );
+
+    // 🔽 Ordenar por calificación
+    detalleRepartidores.sort(
+      (a, b) => b.promedio_calificacion - a.promedio_calificacion
     );
 
     // 5️⃣ Series por fecha
@@ -167,7 +217,7 @@ export const getReporteDesempeno = async (req, res) => {
         fecha: d.fecha,
         entregados: d.entregados,
         cancelados: d.cancelados,
-        tiempoPromedio: d.tiempoPromedio, // ya en minutos
+        tiempoPromedio: d.tiempoPromedio,
       });
     }
 
@@ -178,6 +228,7 @@ export const getReporteDesempeno = async (req, res) => {
         pendientes,
         cancelados,
         promedio_entrega_minutos: promedioEntrega,
+        promedio_calificacion_general: promedioGeneralCalificacion,
       },
       detalle_repartidores: detalleRepartidores,
       series,

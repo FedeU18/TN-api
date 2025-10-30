@@ -376,6 +376,33 @@ async function main() {
     ],
   });
 
+  const pedidosEntregados = await prisma.pedido.findMany({
+    where: {
+      estado: { nombre_estado: "Entregado" },
+      id_repartidor: { not: null },
+    },
+  });
+
+  const comentariosEjemplo = [
+    "Excelente servicio, muy rápido.",
+    "Todo perfecto, muy amable el repartidor.",
+    "Buena atención y entrega puntual.",
+    "Pedido en tiempo y forma, muy recomendable.",
+    "El repartidor fue muy cordial.",
+  ];
+
+  const calificacionesData = pedidosEntregados.map((pedido) => ({
+    id_pedido: pedido.id_pedido,
+    id_cliente: pedido.id_cliente,
+    id_repartidor: pedido.id_repartidor,
+    puntuacion: Math.floor(Math.random() * 3) + 3, // entre 3 y 5
+    comentario:
+      comentariosEjemplo[Math.floor(Math.random() * comentariosEjemplo.length)],
+    fecha: new Date(pedido.fecha_entrega ?? new Date()),
+  }));
+
+  await prisma.calificacion.createMany({ data: calificacionesData });
+
   console.log(
     "✅ Seed extendido completado con 15 pedidos y fechas de entrega realistas."
   );
