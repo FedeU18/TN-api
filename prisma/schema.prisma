@@ -94,7 +94,7 @@ model Calificacion {
   id_cliente      Int
   id_repartidor   Int
   puntuacion      Int
-  comentario      String
+  comentario      String?  // Opcional: el cliente puede dejar o no un comentario
   fecha           DateTime @default(now())
 
   pedido     Pedido  @relation(fields: [id_pedido], references: [id_pedido])

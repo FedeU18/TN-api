@@ -141,11 +141,18 @@ export const calificarRepartidor = async (req, res) => {
     const { pedidoId, puntuacion, comentario } = req.body;
     const clienteId = req.user.id_usuario;
 
-    // Validaciones iniciales
-    if (!pedidoId || !puntuacion || !comentario) {
+    // Validaciones iniciales - solo pedidoId y puntuacion son obligatorios
+    if (!pedidoId || puntuacion === undefined || puntuacion === null) {
       return res.status(400).json({
-        message:
-          "Faltan datos obligatorios: pedidoId, puntuacion o comentario.",
+        message: "Faltan datos obligatorios: pedidoId y puntuacion son requeridos.",
+      });
+    }
+
+    // Validar que la puntuación esté en el rango correcto (1-5)
+    const puntuacionNum = Number(puntuacion);
+    if (isNaN(puntuacionNum) || puntuacionNum < 1 || puntuacionNum > 5) {
+      return res.status(400).json({
+        message: "La puntuación debe ser un número entre 1 y 5.",
       });
     }
 
@@ -196,8 +203,8 @@ export const calificarRepartidor = async (req, res) => {
         id_pedido: Number(pedidoId),
         id_cliente: clienteId,
         id_repartidor: pedido.id_repartidor,
-        puntuacion: Number(puntuacion),
-        comentario,
+        puntuacion: puntuacionNum,
+        comentario: comentario || null,
       },
     });
 
