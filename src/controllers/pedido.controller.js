@@ -205,17 +205,20 @@ export const tomarPedido = async (req, res) => {
       try {
         await sendPushNotification(
           pedidoActualizado.cliente.expo_push_token,
-          '🚚 Pedido asignado',
+          "🚚 Pedido asignado",
           `Tu pedido #${pedidoActualizado.id_pedido} ha sido asignado a un repartidor`,
           {
             pedidoId: pedidoActualizado.id_pedido,
             nuevoEstado: pedidoActualizado.estado.nombre_estado,
-            tipo: 'asignacion',
+            tipo: "asignacion",
           }
         );
         console.log(`✅ Notificación push de asignación enviada al cliente`);
       } catch (pushError) {
-        console.error("Error al enviar notificación push de asignación:", pushError);
+        console.error(
+          "Error al enviar notificación push de asignación:",
+          pushError
+        );
       }
     }
 
@@ -381,39 +384,18 @@ export const actualizarEstadoPedido = async (req, res) => {
     if (!estadoDestino)
       return res.status(400).json({ message: "Estado no válido" });
 
+    // ===================== VALIDACIONES Y NOTIFICACIONES =====================
     if (nuevoEstado === "Entregado") {
-
-      try {
-        // Crear link único al formulario de calificación
-        const linkCalificacion = `${FRONTEND_URL}/calificar?pedidoId=${pedido.id_pedido}`;
-
-        await sendEmail({
-          to: pedido.cliente.email,
-          subject: "¡Tu pedido ha sido entregado!",
-          html: `
-            <p>Hola ${pedido.cliente.nombre},</p>
-            <p>Tu pedido #${pedido.id_pedido} ha sido entregado exitosamente.</p>
-            <p>Nos encantaría saber tu opinión sobre el repartidor que realizó la entrega.</p>
-            <p>
-              <a href="${linkCalificacion}" style="background:#28a745;color:#fff;padding:10px 15px;text-decoration:none;border-radius:5px;">
-                Calificar Repartidor
-              </a>
-            </p>
-            <p>¡Gracias por confiar en nosotros!</p>
-          `,
-        });
-      } catch (mailError) {
-        console.error("Error al enviar mail de calificación:", mailError);
-      }
-
-      // Validar que quien marca como entregado sea el repartidor O el cliente con QR válido
+      // Validar que quien marca como entregado sea el repartidor o cliente con QR válido
       const esRepartidor = pedido.id_repartidor === usuarioId;
       const esCliente = pedido.id_cliente === usuarioId;
 
       if (!esRepartidor && !esCliente) {
         return res
           .status(403)
-          .json({ message: "No autorizado para marcar este pedido como entregado" });
+          .json({
+            message: "No autorizado para marcar este pedido como entregado",
+          });
       }
 
       if (!pedido.qr_token) {
@@ -423,11 +405,9 @@ export const actualizarEstadoPedido = async (req, res) => {
       }
 
       if (!qr_token) {
-        return res
-          .status(400)
-          .json({
-            message: "Debe enviarse el token del QR para entregar el pedido",
-          });
+        return res.status(400).json({
+          message: "Debe enviarse el token del QR para entregar el pedido",
+        });
       }
 
       if (pedido.qr_token !== qr_token) {
@@ -435,35 +415,63 @@ export const actualizarEstadoPedido = async (req, res) => {
           .status(401)
           .json({ message: "Token QR inválido o expirado" });
       }
+
+      // Enviar mail invitando a calificar
+      try {
+        const linkCalificacion = `${FRONTEND_URL}/calificar-repartidor/${pedido.id_pedido}`;
+
+        await sendEmail({
+          to: pedido.cliente.email,
+          subject: "¡Tu pedido ha sido entregado!",
+          html: `
+            <p>Hola ${pedido.cliente.nombre},</p>
+            <p>Tu pedido #${pedido.id_pedido} ha sido entregado exitosamente.</p>
+            <p>Nos encantaría saber tu opinión sobre el repartidor que realizó la entrega.</p>
+            <p>
+              <a href="${linkCalificacion}" 
+                style="background:#28a745;color:#fff;padding:10px 15px;text-decoration:none;border-radius:5px;">
+                Calificar Repartidor
+              </a>
+            </p>
+            <p>¡Gracias por confiar en nosotros!</p>
+          `,
+        });
+      } catch (mailError) {
+        console.error("Error al enviar mail de calificación:", mailError);
+      }
     }
 
-    // Construir dataToUpdate usando el campo escalar id_estado
+    // ===================== CONSTRUCCIÓN DEL UPDATE =====================
     const dataToUpdate = {
       id_estado: estadoDestino.id_estado,
     };
 
+    // Si pasa a "En camino", generar nuevo QR
     if (nuevoEstado === "En camino") {
       const token = crypto.randomBytes(16).toString("hex");
       const qrBase64 = await generateQRCode(id, token);
 
       if (qrBase64) {
-        dataToUpdate.qr_codigo = qrBase64; // Ojo: debe ser nullable en schema si querés setear null luego
+        dataToUpdate.qr_codigo = qrBase64;
         dataToUpdate.qr_token = token;
       }
     }
 
+    // Si pasa a "Entregado", limpiar QR y guardar fecha_entrega actual
     if (nuevoEstado === "Entregado") {
       dataToUpdate.qr_token = null;
-      dataToUpdate.qr_codigo = null; // Requiere qr_codigo?: String? en el schema; si no, usa "" en su lugar
-      dataToUpdate.fecha_entrega = new Date();
+      dataToUpdate.qr_codigo = null;
+      dataToUpdate.fecha_entrega = new Date(); // ← FECHA ACTUAL EN EL MOMENTO DE ENTREGA
     }
 
+    // ===================== ACTUALIZACIÓN PRINCIPAL =====================
     const pedidoActualizado = await prisma.pedido.update({
       where: { id_pedido: Number(id) },
       data: dataToUpdate,
       include: { estado: true, cliente: true, repartidor: true },
     });
 
+    // ===================== NOTIFICACIONES SOCKET Y PUSH =====================
     if (req.io) {
       req.io.to(`pedido_${id}`).emit("estadoActualizado", {
         pedidoId: pedidoActualizado.id_pedido,
@@ -471,33 +479,36 @@ export const actualizarEstadoPedido = async (req, res) => {
         mensaje: `Tu pedido #${pedidoActualizado.id_pedido} cambió a estado "${pedidoActualizado.estado.nombre_estado}"`,
       });
 
-      // Enviar notificación push al cliente cuando el pedido cambia de estado
+      // Enviar notificación push
       if (pedidoActualizado.cliente.expo_push_token) {
         try {
           await sendPushNotification(
             pedidoActualizado.cliente.expo_push_token,
-            '📦 Estado de tu pedido actualizado',
+            "📦 Estado de tu pedido actualizado",
             `Tu pedido #${pedidoActualizado.id_pedido} cambió a: ${pedidoActualizado.estado.nombre_estado}`,
             {
               pedidoId: pedidoActualizado.id_pedido,
               nuevoEstado: pedidoActualizado.estado.nombre_estado,
-              tipo: 'cambio_estado',
+              tipo: "cambio_estado",
             }
           );
-          console.log(`✅ Notificación push enviada al cliente ${pedidoActualizado.cliente.email}`);
+          console.log(
+            `✅ Notificación push enviada al cliente ${pedidoActualizado.cliente.email}`
+          );
         } catch (pushError) {
           console.error("Error al enviar notificación push:", pushError);
         }
       }
 
-      // Enviar email al cliente
+      // Enviar email informando cambio de estado
       try {
         await sendEmail({
           to: pedidoActualizado.cliente.email,
           subject: `Actualización de tu pedido #${pedidoActualizado.id_pedido}`,
           html: `
             <p>Hola ${pedidoActualizado.cliente.nombre},</p>
-            <p>Tu pedido <b>#${pedidoActualizado.id_pedido}</b> cambió al estado <b>${pedidoActualizado.estado.nombre_estado}</b>.</p>
+            <p>Tu pedido <b>#${pedidoActualizado.id_pedido}</b> cambió al estado 
+              <b>${pedidoActualizado.estado.nombre_estado}</b>.</p>
             <p>Podés ver los detalles en la aplicación.</p>
             <p>Gracias por usar nuestro servicio ❤️</p>
           `,
@@ -507,6 +518,7 @@ export const actualizarEstadoPedido = async (req, res) => {
       }
     }
 
+    // ===================== RESPUESTA FINAL =====================
     res.json({
       message: `Estado del pedido actualizado a ${nuevoEstado}`,
       pedido: pedidoActualizado,
@@ -705,7 +717,6 @@ export const guardarUbicacionRepartidor = async (req, res) => {
     // Emitir ubicación en tiempo real
     try {
       req.io.to(`pedido_${id}`).emit("ubicacionActualizada", {
-        
         pedidoId: Number(id),
         latitud: ubicacion.latitud,
         longitud: ubicacion.longitud,
