@@ -150,3 +150,37 @@ export const getUserOrders = async (req, res) => {
       .json({ message: "Error al obtener historial de pedidos" });
   }
 };
+
+// POST /api/users/push-token - Registrar token de notificaciones push
+export const registerPushToken = async (req, res) => {
+  try {
+    const { id_usuario } = req.user;
+    const { token } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ message: "Token es requerido" });
+    }
+
+    // Actualizar el token push del usuario
+    const updatedUser = await prisma.usuario.update({
+      where: { id_usuario },
+      data: { expo_push_token: token },
+      select: {
+        id_usuario: true,
+        nombre: true,
+        email: true,
+        expo_push_token: true,
+      },
+    });
+
+    console.log(`✅ Token push registrado para usuario ${updatedUser.email}: ${token}`);
+
+    return res.json({
+      message: "Token de notificaciones registrado correctamente",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("Error en registerPushToken:", error);
+    return res.status(500).json({ message: "Error al registrar token de notificaciones" });
+  }
+};

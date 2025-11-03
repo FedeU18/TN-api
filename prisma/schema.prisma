@@ -30,6 +30,9 @@ model Usuario {
   resetPasswordToken   String?
   resetPasswordExpires DateTime?
 
+  // Campo para notificaciones push
+  expo_push_token String?
+
   pedidosCliente  Pedido[]       @relation("ClientePedidos")
   pedidosRepartidor Pedido[]     @relation("RepartidorPedidos")
   notificaciones  Notificacion[]

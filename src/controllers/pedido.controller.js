@@ -2,6 +2,9 @@ import prisma from "../lib/prisma.js";
 import crypto from "crypto";
 import { generateQRCode } from "../utils/generateQRCode.js";
 import { sendEmail } from "./sendgrid.controller.js";
+import { sendPushNotification } from "../utils/sendPushNotification.js";
+
+const FRONTEND_URL = process.env.FRONTEND_URL || "http://localhost:5173";
 
 //Obtener todos los pedidos (solo para admins)
 export const getAllPedidos = async (req, res) => {
@@ -197,6 +200,25 @@ export const tomarPedido = async (req, res) => {
         nuevoEstado: pedidoActualizado.estado.nombre_estado,
       });
 
+    // Enviar notificación push al cliente informando que su pedido fue asignado
+    if (pedidoActualizado.cliente.expo_push_token) {
+      try {
+        await sendPushNotification(
+          pedidoActualizado.cliente.expo_push_token,
+          '🚚 Pedido asignado',
+          `Tu pedido #${pedidoActualizado.id_pedido} ha sido asignado a un repartidor`,
+          {
+            pedidoId: pedidoActualizado.id_pedido,
+            nuevoEstado: pedidoActualizado.estado.nombre_estado,
+            tipo: 'asignacion',
+          }
+        );
+        console.log(`✅ Notificación push de asignación enviada al cliente`);
+      } catch (pushError) {
+        console.error("Error al enviar notificación push de asignación:", pushError);
+      }
+    }
+
     res.json({
       message: "Pedido tomado correctamente",
       pedido: pedidoActualizado,
@@ -384,10 +406,14 @@ export const actualizarEstadoPedido = async (req, res) => {
         console.error("Error al enviar mail de calificación:", mailError);
       }
 
-      if (pedido.id_repartidor !== usuarioId) {
+      // Validar que quien marca como entregado sea el repartidor O el cliente con QR válido
+      const esRepartidor = pedido.id_repartidor === usuarioId;
+      const esCliente = pedido.id_cliente === usuarioId;
+
+      if (!esRepartidor && !esCliente) {
         return res
           .status(403)
-          .json({ message: "No autorizado para entregar este pedido" });
+          .json({ message: "No autorizado para marcar este pedido como entregado" });
       }
 
       if (!pedido.qr_token) {
@@ -445,6 +471,26 @@ export const actualizarEstadoPedido = async (req, res) => {
         mensaje: `Tu pedido #${pedidoActualizado.id_pedido} cambió a estado "${pedidoActualizado.estado.nombre_estado}"`,
       });
 
+      // Enviar notificación push al cliente cuando el pedido cambia de estado
+      if (pedidoActualizado.cliente.expo_push_token) {
+        try {
+          await sendPushNotification(
+            pedidoActualizado.cliente.expo_push_token,
+            '📦 Estado de tu pedido actualizado',
+            `Tu pedido #${pedidoActualizado.id_pedido} cambió a: ${pedidoActualizado.estado.nombre_estado}`,
+            {
+              pedidoId: pedidoActualizado.id_pedido,
+              nuevoEstado: pedidoActualizado.estado.nombre_estado,
+              tipo: 'cambio_estado',
+            }
+          );
+          console.log(`✅ Notificación push enviada al cliente ${pedidoActualizado.cliente.email}`);
+        } catch (pushError) {
+          console.error("Error al enviar notificación push:", pushError);
+        }
+      }
+
+      // Enviar email al cliente
       try {
         await sendEmail({
           to: pedidoActualizado.cliente.email,
