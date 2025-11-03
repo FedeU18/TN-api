@@ -89,3 +89,43 @@ export const obtenerDetallePedidoCliente = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
+/**
+ * GET /api/clientes/pedidos/sin-calificar
+ * Obtiene los pedidos entregados del cliente que aún no tienen calificación.
+ */
+export const obtenerPedidosSinCalificar = async (req, res) => {
+  const id_cliente = req.user.id_usuario;
+
+  try {
+    const pedidos = await prisma.pedido.findMany({
+      where: {
+        id_cliente,
+        estado: { nombre_estado: "Entregado" },
+        calificacion: null, // No tiene calificación asociada
+      },
+      include: {
+        estado: true,
+        repartidor: {
+          select: {
+            id_usuario: true,
+            nombre: true,
+            apellido: true,
+            telefono: true,
+          },
+        },
+      },
+      orderBy: { fecha_entrega: "desc" },
+    });
+
+    if (pedidos.length === 0) {
+      return res.status(404).json({
+        message: "No hay pedidos entregados pendientes de calificación.",
+      });
+    }
+
+    res.json(pedidos);
+  } catch (error) {
+    console.error("❌ Error al obtener pedidos sin calificar:", error);
+    res.status(500).json({ message: "Error interno del servidor." });
+  }
+};
