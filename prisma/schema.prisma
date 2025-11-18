@@ -27,7 +27,7 @@ model Usuario {
   rol             String
 
   // Campos para reset password
-  resetPasswordToken   String?
+  resetPasswordToken   Int?
   resetPasswordExpires DateTime?
 
   // Campo para notificaciones push
