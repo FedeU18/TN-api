@@ -14,6 +14,7 @@ import repartidorRoutes from "./routes/repartidor.routes.js";
 import clienteRoutes from "./routes/cliente.routes.js";
 import soapWrapperRoutes from "./routes/soapWrapper.routes.js";
 import weatherRoutes from "./routes/weather.routes.js";
+import vendedorRoutes from "./routes/vendedor.routes.js";
 
 dotenv.config();
 
@@ -49,6 +50,7 @@ app.use("/api/repartidores", repartidorRoutes);
 app.use("/api/clientes", clienteRoutes);
 app.use("/api/soap-wrapper", soapWrapperRoutes);
 app.use("/api/weather", weatherRoutes);
+app.use("/api/vendedor", vendedorRoutes);
 
 // Proxy para el WSDL y manejo de preflight a través del servidor Express principal
 // para evitar bloqueos por CORS desde el navegador
