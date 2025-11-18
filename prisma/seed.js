@@ -130,6 +130,16 @@ async function main() {
       rol: "admin",
     },
   });
+  await prisma.usuario.create({
+    data: {
+      nombre: "Vendedor",
+      apellido: "Vendedor",
+      email: "vendedor@example.com",
+      password: hashedAdminPassword,
+      telefono: "2994999999",
+      rol: "vendedor",
+    },
+  });
 
   // === Estados ===
   const pendiente = await prisma.estadoPedido.create({
