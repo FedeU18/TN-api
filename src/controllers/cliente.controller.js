@@ -129,3 +129,29 @@ export const obtenerPedidosSinCalificar = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
+// services/cliente.service.js
+
+export const getAllClientes = async (req, res) => {
+  try {
+    const clientes = await prisma.usuario.findMany({
+      where: {
+        rol: "cliente", // <-- ajustá si tus roles usan otro nombre
+      },
+      select: {
+        id_usuario: true,
+        nombre: true,
+        email: true,
+      },
+      orderBy: {
+        nombre: "asc",
+      },
+    });
+    res.json({
+      ok: true,
+      data: clientes,
+    });
+  } catch (error) {
+    console.error("❌ Error al obtener pedidos sin calificar:", error);
+    res.status(500).json({ message: "Error interno del servidor." });
+  }
+};
