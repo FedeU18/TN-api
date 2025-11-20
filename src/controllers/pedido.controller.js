@@ -86,35 +86,73 @@ export const getPedidosDisponibles = async (req, res) => {
   }
 };
 
-//Obtener pedidos asignados (para repartidores)
+//Obtener pedidos asignados (para repartidores y clientes)
 export const getMisPedidos = async (req, res) => {
-  const repartidorId = req.user.id_usuario;
+  const usuarioId = req.user.id_usuario;
 
   try {
-    //Validar que el usuario sea repartidor
-    const repartidor = await prisma.usuario.findUnique({
-      where: { id_usuario: repartidorId },
+    //Validar que el usuario sea repartidor o cliente
+    const usuario = await prisma.usuario.findUnique({
+      where: { id_usuario: usuarioId },
     });
 
-    if (!repartidor || repartidor.rol.toLowerCase() !== "repartidor") {
-      return res
-        .status(403)
-        .json({ message: "Solo los repartidores pueden ver sus pedidos" });
+    if (!usuario) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
     }
 
-    //Obtener pedidos asignados al repartidor
-    const pedidos = await prisma.pedido.findMany({
-      where: {
-        id_repartidor: repartidorId,
-      },
-      include: {
-        cliente: true,
-        estado: true,
-      },
-      orderBy: {
-        fecha_creacion: "desc",
-      },
-    });
+    const rol = usuario.rol.toLowerCase();
+    if (rol !== "repartidor" && rol !== "cliente") {
+      return res
+        .status(403)
+        .json({ message: "No autorizado para ver pedidos" });
+    }
+
+    let pedidos;
+    
+    if (rol === "repartidor") {
+      // Los repartidores ven solo los pedidos activos (no completados ni cancelados)
+      pedidos = await prisma.pedido.findMany({
+        where: {
+          id_repartidor: usuarioId,
+          estado: {
+            nombre_estado: {
+              notIn: ["Entregado", "Cancelado"],
+            },
+          },
+        },
+        include: {
+          cliente: true,
+          estado: true,
+        },
+        orderBy: {
+          fecha_creacion: "desc",
+        },
+      });
+    } else {
+      // Los clientes ven solo sus pedidos activos: Pendiente, Asignado, En camino
+      pedidos = await prisma.pedido.findMany({
+        where: {
+          id_cliente: usuarioId,
+          estado: {
+            nombre_estado: {
+              in: ["Pendiente", "Asignado", "En camino"],
+            },
+          },
+        },
+        include: {
+          cliente: true,
+          repartidor: true,
+          estado: true,
+        },
+        orderBy: {
+          fecha_creacion: "desc",
+        },
+      });
+    }
+
+    if (pedidos.length === 0) {
+      return res.status(404).json({ message: "No hay pedidos activos" });
+    }
 
     res.json(pedidos);
   } catch (error) {
@@ -745,3 +783,76 @@ export const guardarUbicacionRepartidor = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor" });
   }
 };
+
+const getHistorial = async (usuarioId, rolEsperado, campoUsuario) => {
+  const usuario = await prisma.usuario.findUnique({
+    where: { id_usuario: usuarioId },
+  });
+
+  if (!usuario) {
+    throw { status: 404, message: "Usuario no encontrado" };
+  }
+
+  if (usuario.rol.toLowerCase() !== rolEsperado) {
+    throw {
+      status: 403,
+      message: `No autorizado. Solo los ${rolEsperado}s pueden acceder a este historial`,
+    };
+  }
+
+  const includeConfig =
+    rolEsperado === "repartidor"
+      ? { cliente: { select: { id_usuario: true, nombre: true, apellido: true, email: true, telefono: true } } }
+      : { repartidor: { select: { id_usuario: true, nombre: true, apellido: true, email: true, telefono: true } } };
+
+  const historial = await prisma.pedido.findMany({
+    where: {
+      [campoUsuario]: usuarioId,
+      estado: {
+        nombre_estado: {
+          in: ["Entregado", "Cancelado"],
+        },
+      },
+    },
+    include: {
+      ...includeConfig,
+      estado: {
+        select: {
+          nombre_estado: true,
+        },
+      },
+    },
+    orderBy: {
+      fecha_creacion: "desc",
+    },
+  });
+
+  if (historial.length === 0) {
+    throw {
+      status: 404,
+      message: rolEsperado === "repartidor" ? "No hay entregas registradas" : "No hay pedidos en el historial",
+    };
+  }
+
+  return historial;
+};
+
+const historialHandler = async (req, res, rol, campo) => {
+  try {
+    const historial = await getHistorial(req.user.id_usuario, rol, campo);
+    res.json(historial);
+  } catch (error) {
+    console.error(`Error en historial (${rol}):`, error);
+    res
+      .status(error.status || 500)
+      .json({ message: error.message || `Error al obtener historial de ${rol}` });
+  }
+};
+
+// Obtener historial de entregas (para repartidores)
+export const getHistorialEntregas = (req, res) =>
+  historialHandler(req, res, "repartidor", "id_repartidor");
+
+// Obtener historial de pedidos (para clientes)
+export const getHistorialPedidos = (req, res) =>
+  historialHandler(req, res, "cliente", "id_cliente");

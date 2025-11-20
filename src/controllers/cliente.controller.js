@@ -2,14 +2,22 @@ import prisma from "../lib/prisma.js";
 
 /**
  * GET /api/clientes/pedidos
- * Obtiene todos los pedidos del cliente autenticado.
+ * Obtiene los pedidos activos del cliente autenticado (Pendiente, Asignado, En camino).
+ * Los pedidos completados/cancelados están en el historial.
  */
 export const obtenerPedidosCliente = async (req, res) => {
   const id_cliente = req.user.id_usuario;
 
   try {
     const pedidos = await prisma.pedido.findMany({
-      where: { id_cliente },
+      where: {
+        id_cliente,
+        estado: {
+          nombre_estado: {
+            in: ["Pendiente", "Asignado", "En camino"],
+          },
+        },
+      },
       include: {
         estado: true,
         repartidor: {
@@ -27,7 +35,7 @@ export const obtenerPedidosCliente = async (req, res) => {
     if (pedidos.length === 0) {
       return res
         .status(404)
-        .json({ message: "No se encontraron pedidos para este cliente." });
+        .json({ message: "No se encontraron pedidos activos para este cliente." });
     }
 
     res.json(pedidos);

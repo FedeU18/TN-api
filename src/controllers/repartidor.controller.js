@@ -217,3 +217,105 @@ export const calificarRepartidor = async (req, res) => {
     res.status(500).json({ message: "Error interno del servidor." });
   }
 };
+
+// Obtener estadísticas del repartidor
+export const getEstadisticasRepartidor = async (req, res) => {
+  try {
+    const { id_usuario } = req.user;
+
+    // Validar que el usuario exista y sea repartidor
+    const usuario = await prisma.usuario.findUnique({
+      where: { id_usuario },
+    });
+
+    if (!usuario) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    if (usuario.rol.toLowerCase() !== "repartidor") {
+      return res.status(403).json({
+        message: "Solo los repartidores pueden ver sus estadísticas",
+      });
+    }
+
+    // Contar entregas completadas
+    const entregasCompletadas = await prisma.pedido.count({
+      where: {
+        id_repartidor: id_usuario,
+        estado: {
+          nombre_estado: "Entregado",
+        },
+      },
+    });
+
+    // Calcular calificación promedio
+    const calificaciones = await prisma.calificacion.findMany({
+      where: {
+        id_repartidor: id_usuario,
+      },
+      select: {
+        puntuacion: true,
+      },
+    });
+
+    const calificacionPromedio =
+      calificaciones.length > 0
+        ? (
+            calificaciones.reduce((sum, cal) => sum + cal.puntuacion, 0) /
+            calificaciones.length
+          ).toFixed(1)
+        : 0;
+
+    // Calcular tiempo promedio de entrega (en minutos)
+    const pedidosEntregados = await prisma.pedido.findMany({
+      where: {
+        id_repartidor: id_usuario,
+        estado: {
+          nombre_estado: "Entregado",
+        },
+      },
+      select: {
+        fecha_creacion: true,
+        fecha_entrega: true,
+      },
+    });
+
+    let tiempoPromedioMinutos = 0;
+    if (pedidosEntregados.length > 0) {
+      const tiemposEntrega = pedidosEntregados
+        .filter((p) => p.fecha_entrega)
+        .map((p) => {
+          const diff = new Date(p.fecha_entrega) - new Date(p.fecha_creacion);
+          return Math.floor(diff / (1000 * 60)); // convertir a minutos
+        });
+
+      if (tiemposEntrega.length > 0) {
+        tiempoPromedioMinutos = Math.round(
+          tiemposEntrega.reduce((a, b) => a + b, 0) / tiemposEntrega.length
+        );
+      }
+    }
+
+    // Contar pedidos cancelados
+    const pedidosCancelados = await prisma.pedido.count({
+      where: {
+        id_repartidor: id_usuario,
+        estado: {
+          nombre_estado: "Cancelado",
+        },
+      },
+    });
+
+    res.json({
+      entregasCompletadas,
+      calificacionPromedio: parseFloat(calificacionPromedio),
+      tiempoPromedioMinutos,
+      pedidosCancelados,
+      totalCalificaciones: calificaciones.length,
+    });
+  } catch (error) {
+    console.error("Error en getEstadisticasRepartidor:", error);
+    res.status(500).json({ message: "Error al obtener estadísticas" });
+  }
+};
+

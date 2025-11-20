@@ -36,13 +36,14 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { id_usuario } = req.user;
-    const { nombre, apellido, telefono, foto_perfil } = req.body;
+    const { nombre, apellido, email, telefono, foto_perfil } = req.body;
 
     const dataToUpdate = {};
-    if (nombre) dataToUpdate.nombre = nombre;
-    if (apellido) dataToUpdate.apellido = apellido;
-    if (telefono) dataToUpdate.telefono = telefono;
-    if (foto_perfil) dataToUpdate.foto_perfil = foto_perfil;
+    if (nombre && nombre.trim()) dataToUpdate.nombre = nombre.trim();
+    if (apellido && apellido.trim()) dataToUpdate.apellido = apellido.trim();
+    if (email && email.trim()) dataToUpdate.email = email.trim();
+    if (telefono && telefono.trim()) dataToUpdate.telefono = telefono.trim();
+    if (foto_perfil && foto_perfil.trim()) dataToUpdate.foto_perfil = foto_perfil.trim();
 
     const updatedUser = await prisma.usuario.update({
       where: { id_usuario },
@@ -64,7 +65,7 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en updateProfile:", error);
-    return res.status(500).json({ message: "Error al actualizar perfil" });
+    return res.status(500).json({ message: "Error al actualizar perfil: " + error.message });
   }
 };
 
