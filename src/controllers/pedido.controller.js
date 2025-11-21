@@ -129,13 +129,13 @@ export const getMisPedidos = async (req, res) => {
         },
       });
     } else {
-      // Los clientes ven solo sus pedidos activos: Pendiente, Asignado, En camino
+      // Los clientes ven todos sus pedidos activos (no completados ni cancelados)
       pedidos = await prisma.pedido.findMany({
         where: {
           id_cliente: usuarioId,
           estado: {
             nombre_estado: {
-              in: ["Pendiente", "Asignado", "En camino"],
+              notIn: ["Entregado", "Cancelado"],
             },
           },
         },
@@ -515,6 +515,9 @@ export const actualizarEstadoPedido = async (req, res) => {
         pedidoId: pedidoActualizado.id_pedido,
         nuevoEstado: pedidoActualizado.estado.nombre_estado,
         mensaje: `Tu pedido #${pedidoActualizado.id_pedido} cambió a estado "${pedidoActualizado.estado.nombre_estado}"`,
+        ...(pedidoActualizado.fecha_entrega && {
+          fecha_entrega: pedidoActualizado.fecha_entrega,
+        }),
       });
 
       // Enviar notificación push
