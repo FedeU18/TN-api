@@ -163,12 +163,15 @@ io.on("connection", (socket) => {
     console.log("Rooms actuales:", socket.rooms);
   });
 
+  socket.on("leavePedido", (pedidoId) => {
+    socket.leave(`pedido_${pedidoId}`);
+  });
+
   socket.on("disconnect", () => {
-    console.log(`🔴 Usuario desconectado: ${socket.id}`);
   });
 });
 
 // Iniciar servidor
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Servidor corriendo en http://localhost:${PORT}`);
+  console.log(`Servidor corriendo en http://localhost:${PORT}`);
 });
