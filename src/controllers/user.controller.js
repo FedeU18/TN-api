@@ -1,6 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
 const prisma = new PrismaClient();
+import cloudinary from "cloudinary";
+cloudinary.v2.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 //get /api/users/me
 export const getProfile = async (req, res) => {
@@ -32,18 +38,51 @@ export const getProfile = async (req, res) => {
   }
 };
 
+const uploadStreamToCloudinary = (fileBuffer) => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.v2.uploader.upload_stream(
+      { folder: "usuarios_perfil" },
+      (error, result) => {
+        if (result) resolve(result);
+        else reject(error);
+      }
+    );
+    streamifier.createReadStream(fileBuffer).pipe(stream);
+  });
+};
+
 //put /api/users/me
 export const updateProfile = async (req, res) => {
   try {
     const { id_usuario } = req.user;
-    const { nombre, apellido, email, telefono, foto_perfil } = req.body;
+
+    const {
+      nombre,
+      apellido,
+      email,
+      telefono,
+      // si venía en texto (base64 o url), también lo aceptamos
+      foto_perfil,
+    } = req.body;
 
     const dataToUpdate = {};
-    if (nombre && nombre.trim()) dataToUpdate.nombre = nombre.trim();
-    if (apellido && apellido.trim()) dataToUpdate.apellido = apellido.trim();
-    if (email && email.trim()) dataToUpdate.email = email.trim();
-    if (telefono && telefono.trim()) dataToUpdate.telefono = telefono.trim();
-    if (foto_perfil && foto_perfil.trim()) dataToUpdate.foto_perfil = foto_perfil.trim();
+
+    if (nombre?.trim()) dataToUpdate.nombre = nombre.trim();
+    if (apellido?.trim()) dataToUpdate.apellido = apellido.trim();
+    if (email?.trim()) dataToUpdate.email = email.trim();
+    if (telefono?.trim()) dataToUpdate.telefono = telefono.trim();
+
+    // =====================================================
+    // ⭐ SUBIDA DE FOTO SI VIENE ARCHIVO (multipart/form-data)
+    // req.file contiene la foto binaria enviada desde el input
+    // =====================================================
+    if (req.file) {
+      const uploadResult = await uploadStreamToCloudinary(req.file.buffer);
+      dataToUpdate.foto_perfil = uploadResult.secure_url;
+    } else if (foto_perfil?.trim()) {
+      // si el front envía un URL o base64 manualmente
+      dataToUpdate.foto_perfil = foto_perfil.trim();
+    }
 
     const updatedUser = await prisma.usuario.update({
       where: { id_usuario },
@@ -65,7 +104,9 @@ export const updateProfile = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en updateProfile:", error);
-    return res.status(500).json({ message: "Error al actualizar perfil: " + error.message });
+    return res
+      .status(500)
+      .json({ message: "Error al actualizar perfil: " + error.message });
   }
 };
 
@@ -174,7 +215,9 @@ export const registerPushToken = async (req, res) => {
       },
     });
 
-    console.log(`✅ Token push registrado para usuario ${updatedUser.email}: ${token}`);
+    console.log(
+      `✅ Token push registrado para usuario ${updatedUser.email}: ${token}`
+    );
 
     return res.json({
       message: "Token de notificaciones registrado correctamente",
@@ -182,6 +225,8 @@ export const registerPushToken = async (req, res) => {
     });
   } catch (error) {
     console.error("Error en registerPushToken:", error);
-    return res.status(500).json({ message: "Error al registrar token de notificaciones" });
+    return res
+      .status(500)
+      .json({ message: "Error al registrar token de notificaciones" });
   }
 };
