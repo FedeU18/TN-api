@@ -236,6 +236,14 @@ export const tomarPedido = async (req, res) => {
       .emit("estadoActualizado", {
         pedidoId: pedidoActualizado.id_pedido,
         nuevoEstado: pedidoActualizado.estado.nombre_estado,
+        repartidor: pedidoActualizado.repartidor
+          ? {
+              id: pedidoActualizado.repartidor.id_usuario,
+              nombre: pedidoActualizado.repartidor.nombre,
+              telefono: pedidoActualizado.repartidor.telefono,
+              foto: pedidoActualizado.repartidor.foto_perfil ?? null,
+            }
+          : null,
       });
 
     // Enviar notificación push al cliente
