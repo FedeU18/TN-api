@@ -108,7 +108,7 @@ export const getMisPedidos = async (req, res) => {
     }
 
     let pedidos;
-    
+
     if (rol === "repartidor") {
       // Los repartidores ven solo los pedidos activos (no completados ni cancelados)
       pedidos = await prisma.pedido.findMany({
@@ -167,7 +167,7 @@ export const tomarPedido = async (req, res) => {
   const repartidorId = req.user.id_usuario;
 
   try {
-    //Validar que el usuario sea repartidor
+    // Validar que el usuario sea repartidor
     const repartidor = await prisma.usuario.findUnique({
       where: { id_usuario: repartidorId },
     });
@@ -178,7 +178,7 @@ export const tomarPedido = async (req, res) => {
         .json({ message: "Solo los repartidores pueden tomar pedidos" });
     }
 
-    //Validar pedido
+    // Validar pedido
     const pedido = await prisma.pedido.findUnique({
       where: { id_pedido: Number(id) },
       include: { estado: true },
@@ -190,7 +190,7 @@ export const tomarPedido = async (req, res) => {
     if (pedido.id_repartidor)
       return res.status(400).json({ message: "El pedido ya está asignado" });
 
-    //Estado "Asignado"
+    // Estado "Asignado"
     const estadoAsignado = await prisma.estadoPedido.findFirst({
       where: { nombre_estado: "Asignado" },
     });
@@ -200,7 +200,7 @@ export const tomarPedido = async (req, res) => {
         message: "No existe el estado 'Asignado' en la base de datos",
       });
 
-    //Actualizar pedido con el repartidor que lo toma
+    // Actualizar pedido con el repartidor que lo toma
     const pedidoActualizado = await prisma.pedido.update({
       where: { id_pedido: Number(id) },
       data: {
@@ -214,7 +214,7 @@ export const tomarPedido = async (req, res) => {
       },
     });
 
-    //Crear notificación
+    // Crear notificación interna
     const tipoNotif = await prisma.tipoNotificacion.findFirst({
       where: { nombre_tipo: "Asignación de pedido" },
     });
@@ -230,7 +230,7 @@ export const tomarPedido = async (req, res) => {
       });
     }
 
-    //Emitir actualización en tiempo real
+    // Emitir actualización en tiempo real (socket)
     req.io
       .to(`pedido_${pedidoActualizado.id_pedido}`)
       .emit("estadoActualizado", {
@@ -238,7 +238,7 @@ export const tomarPedido = async (req, res) => {
         nuevoEstado: pedidoActualizado.estado.nombre_estado,
       });
 
-    // Enviar notificación push al cliente informando que su pedido fue asignado
+    // Enviar notificación push al cliente
     if (pedidoActualizado.cliente.expo_push_token) {
       try {
         await sendPushNotification(
@@ -251,12 +251,9 @@ export const tomarPedido = async (req, res) => {
             tipo: "asignacion",
           }
         );
-        console.log(`✅ Notificación push de asignación enviada al cliente`);
+        console.log(`✅ Notificación push enviada al cliente`);
       } catch (pushError) {
-        console.error(
-          "Error al enviar notificación push de asignación:",
-          pushError
-        );
+        console.error("❌ Error al enviar notificación push:", pushError);
       }
     }
 
@@ -422,94 +419,63 @@ export const actualizarEstadoPedido = async (req, res) => {
     if (!estadoDestino)
       return res.status(400).json({ message: "Estado no válido" });
 
-    // ===================== VALIDACIONES Y NOTIFICACIONES =====================
+    // Validaciones especiales para "Entregado"
     if (nuevoEstado === "Entregado") {
-      // Validar que quien marca como entregado sea el repartidor o cliente con QR válido
       const esRepartidor = pedido.id_repartidor === usuarioId;
       const esCliente = pedido.id_cliente === usuarioId;
 
       if (!esRepartidor && !esCliente) {
         return res
           .status(403)
-          .json({
-            message: "No autorizado para marcar este pedido como entregado",
-          });
+          .json({ message: "No autorizado para marcar como entregado" });
       }
 
-      if (!pedido.qr_token) {
-        return res
-          .status(400)
-          .json({ message: "El pedido no tiene un QR asociado" });
-      }
-
-      if (!qr_token) {
-        return res.status(400).json({
-          message: "Debe enviarse el token del QR para entregar el pedido",
-        });
-      }
-
-      if (pedido.qr_token !== qr_token) {
+      if (!pedido.qr_token || !qr_token || pedido.qr_token !== qr_token) {
         return res
           .status(401)
-          .json({ message: "Token QR inválido o expirado" });
+          .json({ message: "Token QR inválido o faltante" });
       }
 
-      // Enviar mail invitando a calificar
+      // Enviar mail de calificación
       try {
         const linkCalificacion = `${FRONTEND_URL}/calificar-repartidor/${pedido.id_pedido}`;
-
         await sendEmail({
           to: pedido.cliente.email,
           subject: "¡Tu pedido ha sido entregado!",
-          html: `
-            <p>Hola ${pedido.cliente.nombre},</p>
-            <p>Tu pedido #${pedido.id_pedido} ha sido entregado exitosamente.</p>
-            <p>Nos encantaría saber tu opinión sobre el repartidor que realizó la entrega.</p>
-            <p>
-              <a href="${linkCalificacion}" 
-                style="background:#28a745;color:#fff;padding:10px 15px;text-decoration:none;border-radius:5px;">
-                Calificar Repartidor
-              </a>
-            </p>
-            <p>¡Gracias por confiar en nosotros!</p>
-          `,
+          html: `<p>Hola ${pedido.cliente.nombre},</p>
+                 <p>Tu pedido #${pedido.id_pedido} ha sido entregado exitosamente.</p>
+                 <p><a href="${linkCalificacion}">Calificar Repartidor</a></p>`,
         });
       } catch (mailError) {
         console.error("Error al enviar mail de calificación:", mailError);
       }
     }
 
-    // ===================== CONSTRUCCIÓN DEL UPDATE =====================
-    const dataToUpdate = {
-      id_estado: estadoDestino.id_estado,
-    };
+    // Construcción del update
+    const dataToUpdate = { id_estado: estadoDestino.id_estado };
 
-    // Si pasa a "En camino", generar nuevo QR
     if (nuevoEstado === "En camino") {
       const token = crypto.randomBytes(16).toString("hex");
       const qrBase64 = await generateQRCode(id, token);
-
       if (qrBase64) {
         dataToUpdate.qr_codigo = qrBase64;
         dataToUpdate.qr_token = token;
       }
     }
 
-    // Si pasa a "Entregado", limpiar QR y guardar fecha_entrega actual
     if (nuevoEstado === "Entregado") {
       dataToUpdate.qr_token = null;
       dataToUpdate.qr_codigo = null;
-      dataToUpdate.fecha_entrega = new Date(); // ← FECHA ACTUAL EN EL MOMENTO DE ENTREGA
+      dataToUpdate.fecha_entrega = new Date();
     }
 
-    // ===================== ACTUALIZACIÓN PRINCIPAL =====================
     const pedidoActualizado = await prisma.pedido.update({
       where: { id_pedido: Number(id) },
       data: dataToUpdate,
       include: { estado: true, cliente: true, repartidor: true },
     });
 
-    // ===================== NOTIFICACIONES SOCKET Y PUSH =====================
+    // Notificaciones socket y push
     if (req.io) {
       req.io.to(`pedido_${id}`).emit("estadoActualizado", {
         pedidoId: pedidoActualizado.id_pedido,
@@ -520,7 +486,7 @@ export const actualizarEstadoPedido = async (req, res) => {
         }),
       });
 
-      // Enviar notificación push
+      // Notificación push al cliente
       if (pedidoActualizado.cliente.expo_push_token) {
         try {
           await sendPushNotification(
@@ -537,29 +503,11 @@ export const actualizarEstadoPedido = async (req, res) => {
             `✅ Notificación push enviada al cliente ${pedidoActualizado.cliente.email}`
           );
         } catch (pushError) {
-          console.error("Error al enviar notificación push:", pushError);
+          console.error("❌ Error al enviar notificación push:", pushError);
         }
-      }
-
-      // Enviar email informando cambio de estado
-      try {
-        await sendEmail({
-          to: pedidoActualizado.cliente.email,
-          subject: `Actualización de tu pedido #${pedidoActualizado.id_pedido}`,
-          html: `
-            <p>Hola ${pedidoActualizado.cliente.nombre},</p>
-            <p>Tu pedido <b>#${pedidoActualizado.id_pedido}</b> cambió al estado 
-              <b>${pedidoActualizado.estado.nombre_estado}</b>.</p>
-            <p>Podés ver los detalles en la aplicación.</p>
-            <p>Gracias por usar nuestro servicio ❤️</p>
-          `,
-        });
-      } catch (emailError) {
-        console.error("Error al enviar email de cambio de estado:", emailError);
       }
     }
 
-    // ===================== RESPUESTA FINAL =====================
     res.json({
       message: `Estado del pedido actualizado a ${nuevoEstado}`,
       pedido: pedidoActualizado,
@@ -805,8 +753,28 @@ const getHistorial = async (usuarioId, rolEsperado, campoUsuario) => {
 
   const includeConfig =
     rolEsperado === "repartidor"
-      ? { cliente: { select: { id_usuario: true, nombre: true, apellido: true, email: true, telefono: true } } }
-      : { repartidor: { select: { id_usuario: true, nombre: true, apellido: true, email: true, telefono: true } } };
+      ? {
+          cliente: {
+            select: {
+              id_usuario: true,
+              nombre: true,
+              apellido: true,
+              email: true,
+              telefono: true,
+            },
+          },
+        }
+      : {
+          repartidor: {
+            select: {
+              id_usuario: true,
+              nombre: true,
+              apellido: true,
+              email: true,
+              telefono: true,
+            },
+          },
+        };
 
   const historial = await prisma.pedido.findMany({
     where: {
@@ -833,7 +801,10 @@ const getHistorial = async (usuarioId, rolEsperado, campoUsuario) => {
   if (historial.length === 0) {
     throw {
       status: 404,
-      message: rolEsperado === "repartidor" ? "No hay entregas registradas" : "No hay pedidos en el historial",
+      message:
+        rolEsperado === "repartidor"
+          ? "No hay entregas registradas"
+          : "No hay pedidos en el historial",
     };
   }
 
@@ -846,9 +817,9 @@ const historialHandler = async (req, res, rol, campo) => {
     res.json(historial);
   } catch (error) {
     console.error(`Error en historial (${rol}):`, error);
-    res
-      .status(error.status || 500)
-      .json({ message: error.message || `Error al obtener historial de ${rol}` });
+    res.status(error.status || 500).json({
+      message: error.message || `Error al obtener historial de ${rol}`,
+    });
   }
 };
 
