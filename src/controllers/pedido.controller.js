@@ -240,6 +240,7 @@ export const tomarPedido = async (req, res) => {
           ? {
               id: pedidoActualizado.repartidor.id_usuario,
               nombre: pedidoActualizado.repartidor.nombre,
+              apellido: pedidoActualizado.repartidor.apellido,
               telefono: pedidoActualizado.repartidor.telefono,
               foto: pedidoActualizado.repartidor.foto_perfil ?? null,
             }
