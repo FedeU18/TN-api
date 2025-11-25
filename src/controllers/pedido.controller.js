@@ -477,14 +477,23 @@ export const actualizarEstadoPedido = async (req, res) => {
 
     // Notificaciones socket y push
     if (req.io) {
-      req.io.to(`pedido_${id}`).emit("estadoActualizado", {
-        pedidoId: pedidoActualizado.id_pedido,
-        nuevoEstado: pedidoActualizado.estado.nombre_estado,
-        mensaje: `Tu pedido #${pedidoActualizado.id_pedido} cambió a estado "${pedidoActualizado.estado.nombre_estado}"`,
-        ...(pedidoActualizado.fecha_entrega && {
-          fecha_entrega: pedidoActualizado.fecha_entrega,
-        }),
-      });
+      if (req.io) {
+        req.io.to(`pedido_${id}`).emit("estadoActualizado", {
+          pedidoId: pedidoActualizado.id_pedido,
+          nuevoEstado: pedidoActualizado.estado.nombre_estado,
+          mensaje: `Tu pedido #${pedidoActualizado.id_pedido} cambió a estado "${pedidoActualizado.estado.nombre_estado}"`,
+          ...(pedidoActualizado.fecha_entrega && {
+            fecha_entrega: pedidoActualizado.fecha_entrega,
+          }),
+          repartidor: pedidoActualizado.repartidor
+            ? {
+                id_repartidor: pedidoActualizado.repartidor.id_repartidor,
+                nombre: pedidoActualizado.repartidor.nombre,
+                apellido: pedidoActualizado.repartidor.apellido,
+              }
+            : null,
+        });
+      }
 
       // Notificación push al cliente
       if (pedidoActualizado.cliente.expo_push_token) {
