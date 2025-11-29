@@ -34,6 +34,7 @@ model Usuario {
   expo_push_token String?
 
   pedidosCliente  Pedido[]       @relation("ClientePedidos")
+  pedidosVendedor Pedido[]       @relation("VendedorPedidos")
   pedidosRepartidor Pedido[]     @relation("RepartidorPedidos")
   notificaciones  Notificacion[]
   calificacionesCliente Calificacion[] @relation("ClienteCalificaciones")
@@ -51,6 +52,7 @@ model EstadoPedido {
 model Pedido {
   id_pedido      Int           @id @default(autoincrement())
   id_cliente     Int
+  id_vendedor    Int?
   id_repartidor  Int?
   direccion_origen   String
   direccion_destino  String
@@ -65,6 +67,7 @@ model Pedido {
   qr_token       String?       
 
   cliente        Usuario       @relation("ClientePedidos", fields: [id_cliente], references: [id_usuario])
+  vendedor       Usuario?      @relation("VendedorPedidos", fields: [id_vendedor], references: [id_usuario])
   repartidor     Usuario?      @relation("RepartidorPedidos", fields: [id_repartidor], references: [id_usuario])
   estado         EstadoPedido  @relation(fields: [id_estado], references: [id_estado])
   ubicaciones    Ubicacion[]
