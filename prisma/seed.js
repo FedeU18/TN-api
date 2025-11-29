@@ -142,6 +142,9 @@ async function main() {
   });
 
   // === Estados ===
+  const noPagado = await prisma.estadoPedido.create({
+    data: { nombre_estado: "No pagado" },
+  });
   const pendiente = await prisma.estadoPedido.create({
     data: { nombre_estado: "Pendiente" },
   });

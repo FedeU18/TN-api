@@ -64,7 +64,14 @@ model Pedido {
   fecha_creacion DateTime      @default(now())
   fecha_entrega  DateTime?
   qr_codigo      String?
-  qr_token       String?       
+  qr_token       String?
+  
+  // Campos de pago
+  monto_pedido         Decimal?      @db.Decimal(10,2)
+  id_transaccion_pago  String?
+  fecha_pago           DateTime?
+  estado_pago          String?       @default("pendiente")
+  metodo_pago          String?
 
   cliente        Usuario       @relation("ClientePedidos", fields: [id_cliente], references: [id_usuario])
   vendedor       Usuario?      @relation("VendedorPedidos", fields: [id_vendedor], references: [id_usuario])

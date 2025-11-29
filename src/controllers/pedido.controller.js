@@ -190,6 +190,13 @@ export const tomarPedido = async (req, res) => {
     if (pedido.id_repartidor)
       return res.status(400).json({ message: "El pedido ya está asignado" });
 
+    // Validar que el pedido esté pagado
+    if (pedido.estado_pago !== "pagado") {
+      return res.status(400).json({
+        message: `No se puede asignar un pedido sin pago. Estado de pago: ${pedido.estado_pago}`,
+      });
+    }
+
     // Estado "Asignado"
     const estadoAsignado = await prisma.estadoPedido.findFirst({
       where: { nombre_estado: "Asignado" },

@@ -19,6 +19,7 @@ export const crearPedidoVendedor = async (req, res) => {
       origen_longitud,
       destino_latitud,
       destino_longitud,
+      monto_pedido,
     } = req.body;
 
     // Validación mínima
@@ -35,14 +36,14 @@ export const crearPedidoVendedor = async (req, res) => {
       return res.status(404).json({ message: "El cliente no existe." });
     }
 
-    // Verificar que exista el estado inicial del pedido (ej: 'Pendiente')
+    // Verificar que exista el estado inicial del pedido (ej: 'No pagado')
     const estadoInicial = await prisma.estadoPedido.findFirst({
-      where: { nombre_estado: "Pendiente" },
+      where: { nombre_estado: "No pagado" },
     });
 
     if (!estadoInicial) {
       return res.status(500).json({
-        message: "No existe un estado inicial 'Pendiente' en la base de datos.",
+         message: "No existe un estado inicial 'No pagado' en la base de datos.",
       });
     }
 
@@ -58,6 +59,8 @@ export const crearPedidoVendedor = async (req, res) => {
         origen_longitud: origen_longitud || null,
         destino_latitud: destino_latitud || null,
         destino_longitud: destino_longitud || null,
+        monto_pedido: monto_pedido ? parseFloat(monto_pedido) : null,
+        estado_pago: "pendiente",
       },
     });
 

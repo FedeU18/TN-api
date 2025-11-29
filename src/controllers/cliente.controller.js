@@ -2,7 +2,7 @@ import prisma from "../lib/prisma.js";
 
 /**
  * GET /api/clientes/pedidos
- * Obtiene los pedidos activos del cliente autenticado (Pendiente, Asignado, En camino).
+ * Obtiene los pedidos activos del cliente autenticado (No pagado, Pendiente, Asignado, En camino).
  * Los pedidos completados/cancelados están en el historial.
  */
 export const obtenerPedidosCliente = async (req, res) => {
@@ -14,7 +14,7 @@ export const obtenerPedidosCliente = async (req, res) => {
         id_cliente,
         estado: {
           nombre_estado: {
-            in: ["Pendiente", "Asignado", "En camino"],
+            in: ["No pagado", "Pendiente", "Asignado", "En camino"],
           },
         },
       },
