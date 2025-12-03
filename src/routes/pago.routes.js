@@ -6,6 +6,7 @@ import {
   confirmarPago,
   reembolsarPago,
   procesarWebhookMercadoPago,
+  simularPago,
 } from "../controllers/pago.controller.js";
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.post("/confirmar", confirmarPago);
 // Rutas protegidas
 router.get("/estado/:id_pedido", verifyJWT, obtenerEstadoPago);
 router.post("/crear-preferencia/:id_pedido", verifyJWT, crearPreferenciaPago);
+router.post("/simular-pago/:id_pedido", verifyJWT, simularPago);
 router.post("/reembolsar/:id_pedido", verifyJWT, reembolsarPago);
 
 export default router;

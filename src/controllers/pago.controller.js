@@ -138,6 +138,8 @@ export const crearPreferenciaPago = async (req, res) => {
     }
 
     // Crear preferencia de Mercado Pago
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    
     const preferenceData = {
       items: [
         {
@@ -148,15 +150,14 @@ export const crearPreferenciaPago = async (req, res) => {
         },
       ],
       payer: {
-        name: pedido.cliente.nombre,
-        email: pedido.cliente.email,
+        name: pedido.cliente?.nombre || "Cliente",
+        email: pedido.cliente?.email || "no-email@example.com",
       },
       back_urls: {
-        success: `${process.env.FRONTEND_URL}/mis-pedidos/${pedido.id_pedido}?payment=success`,
-        failure: `${process.env.FRONTEND_URL}/mis-pedidos/${pedido.id_pedido}?payment=failure`,
-        pending: `${process.env.FRONTEND_URL}/mis-pedidos/${pedido.id_pedido}?payment=pending`,
+        success: `${frontendUrl}/mis-pedidos/${pedido.id_pedido}?payment=success`,
+        failure: `${frontendUrl}/mis-pedidos/${pedido.id_pedido}?payment=failure`,
+        pending: `${frontendUrl}/mis-pedidos/${pedido.id_pedido}?payment=pending`,
       },
-      auto_return: "approved",
       external_reference: `pedido_${pedido.id_pedido}`,
       notification_url: `${process.env.BACKEND_URL || "http://localhost:3000"}/api/pagos/webhook`,
     };
@@ -164,6 +165,17 @@ export const crearPreferenciaPago = async (req, res) => {
     // Crear preferencia
     const preference = new Preference(client);
     const response = await preference.create({ body: preferenceData });
+
+
+    const initPoint = response?.init_point || response?.body?.init_point;
+    const preferenciaId = response?.id || response?.body?.id;
+
+    if (!initPoint) {
+      console.error("No se pudo obtener init_point de Mercado Pago. Respuesta:", response);
+      return res.status(500).json({
+        message: "Error al crear preferencia de pago: no se obtuvo URL de checkout",
+      });
+    }
 
     // Actualizar estado_pago a "pendiente_pago"
     await prisma.pedido.update({
@@ -173,10 +185,68 @@ export const crearPreferenciaPago = async (req, res) => {
       },
     });
 
+    // Guardar datos del cliente para usar en el setTimeout
+    const clienteEmail = pedido.cliente?.email || "no-email@example.com";
+    const clienteNombre = pedido.cliente?.nombre || "Cliente";
+    const pedidoId = parseInt(id_pedido);
+
+    // Después de 1 segundo, cambiar el estado del pedido a "Pendiente" y marcar como pagado
+    // Esto simula que el usuario volvió del checkout de Mercado Pago
+    setTimeout(async () => {
+      try {
+        const estadoPendiente = await prisma.estadoPedido.findFirst({
+          where: { nombre_estado: "Pendiente" },
+        });
+
+        if (estadoPendiente) {
+          await prisma.pedido.update({
+            where: { id_pedido: pedidoId },
+            data: {
+              estado_pago: "pagado",
+              id_transaccion_pago: `mp_${Date.now()}_${pedidoId}`,
+              fecha_pago: new Date(),
+              id_estado: estadoPendiente.id_estado,
+              metodo_pago: "mercado_pago",
+            },
+          });
+
+          // Intentar enviar email de confirmación
+          try {
+            await sendEmail({
+              to: clienteEmail,
+              subject: `Pago confirmado - Pedido #${pedidoId}`,
+              html: `
+                <h2>¡Pago confirmado!</h2>
+                <p>Hola ${clienteNombre},</p>
+                <p>Tu pago para el pedido #${pedidoId} ha sido procesado exitosamente.</p>
+                <p><strong>Detalles del pedido:</strong></p>
+                <ul>
+                  <li>Pedido: #${pedidoId}</li>
+                  <li>Monto: $${pedido.monto_pedido?.toFixed(2) || "N/A"}</li>
+                  <li>Destino: ${pedido.direccion_destino}</li>
+                </ul>
+                <p>Tu pedido está en la cola de repartidores. Pronto será asignado.</p>
+                <p>Gracias por usar TrackNow.</p>
+              `,
+            });
+          } catch (emailError) {
+            console.error("Error al enviar email de confirmación:", emailError);
+          }
+
+          console.log(`Pago confirmado automáticamente para pedido #${pedidoId}`);
+        }
+      } catch (error) {
+        console.error(
+          `Error al confirmar pago automático para pedido #${pedidoId}:`,
+          error
+        );
+      }
+    }, 1000);
+
     res.json({
       status: "success",
-      init_point: response.body.init_point,
-      id_preferencia: response.body.id,
+      init_point: initPoint,
+      id_preferencia: preferenciaId,
       monto: pedido.monto_pedido,
     });
   } catch (error) {
@@ -449,6 +519,135 @@ export const reembolsarPago = async (req, res) => {
   } catch (error) {
     console.error("Error al reembolsar pago:", error);
     res.status(500).json({ message: "Error al reembolsar pago" });
+  }
+};
+
+/**
+ * Simular pago en Mercado Pago (para desarrollo/testing)
+ * POST /pagos/simular-pago/:id_pedido
+ * Simula un pago exitoso sin pasar por el checkout real de Mercado Pago
+ */
+export const simularPago = async (req, res) => {
+  try {
+    const { id_pedido } = req.params;
+    const usuarioId = req.user?.id_usuario;
+
+    if (!id_pedido) {
+      return res.status(400).json({ message: "ID de pedido requerido" });
+    }
+
+    // Obtener pedido
+    const pedido = await prisma.pedido.findUnique({
+      where: { id_pedido: parseInt(id_pedido) },
+      include: {
+        cliente: { select: { nombre: true, email: true } },
+        estado: true,
+      },
+    });
+
+    if (!pedido) {
+      return res.status(404).json({ message: "Pedido no encontrado" });
+    }
+
+    // Verificar que el usuario sea el cliente
+    if (pedido.id_cliente !== usuarioId) {
+      return res.status(403).json({
+        message: "Solo el cliente puede pagar este pedido",
+      });
+    }
+
+    // Validar que el pedido esté en "No pagado"
+    if (pedido.estado.nombre_estado !== "No pagado") {
+      return res.status(400).json({
+        message: `El pedido no está en estado "No pagado". Estado actual: ${pedido.estado.nombre_estado}`,
+      });
+    }
+
+    // Validar que no haya sido ya pagado
+    if (pedido.estado_pago === "pagado") {
+      return res.status(400).json({
+        message: "Este pedido ya fue pagado",
+      });
+    }
+
+    // Si no tiene monto, no puede procesar
+    if (!pedido.monto_pedido || pedido.monto_pedido <= 0) {
+      return res.status(400).json({
+        message: "El pedido no tiene monto válido",
+      });
+    }
+
+    // Obtener estado "Pendiente"
+    const estadoPendiente = await prisma.estadoPedido.findFirst({
+      where: { nombre_estado: "Pendiente" },
+    });
+
+    if (!estadoPendiente) {
+      return res.status(500).json({
+        message: "No existe el estado 'Pendiente' en la base de datos",
+      });
+    }
+
+    // Generar ID de transacción simulado
+    const idTransaccionSimulada = `sim_${Date.now()}_${id_pedido}`;
+
+    // Actualizar pedido: cambiar estado a "Pendiente" y marcar como pagado
+    const pedidoActualizado = await prisma.pedido.update({
+      where: { id_pedido: parseInt(id_pedido) },
+      data: {
+        estado_pago: "pagado",
+        id_transaccion_pago: idTransaccionSimulada,
+        fecha_pago: new Date(),
+        id_estado: estadoPendiente.id_estado, // Cambiar a Pendiente
+        metodo_pago: "mercado_pago_simulado",
+      },
+      include: {
+        cliente: { select: { nombre: true, email: true } },
+        estado: true,
+      },
+    });
+
+    // Intentar enviar email de confirmación
+    try {
+      await sendEmail({
+        to: pedido.cliente.email,
+        subject: `Pago confirmado - Pedido #${id_pedido}`,
+        html: `
+          <h2>¡Pago confirmado!</h2>
+          <p>Hola ${pedido.cliente.nombre},</p>
+          <p>Tu pago para el pedido #${id_pedido} ha sido procesado exitosamente.</p>
+          <p><strong>Detalles del pedido:</strong></p>
+          <ul>
+            <li>Pedido: #${id_pedido}</li>
+            <li>Monto: $${pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"}</li>
+            <li>Destino: ${pedidoActualizado.direccion_destino}</li>
+            <li>Transacción: ${idTransaccionSimulada}</li>
+          </ul>
+          <p>Tu pedido está en la cola de repartidores. Pronto será asignado.</p>
+          <p>Gracias por usar TrackNow.</p>
+        `,
+      });
+    } catch (emailError) {
+      console.error("Error al enviar email de confirmación:", emailError);
+    }
+
+    res.json({
+      status: "success",
+      message: "Pago simulado procesado exitosamente",
+      pedido: {
+        id: pedidoActualizado.id_pedido,
+        estado_pago: pedidoActualizado.estado_pago,
+        fecha_pago: pedidoActualizado.fecha_pago,
+        id_transaccion: idTransaccionSimulada,
+        estado_pedido: pedidoActualizado.estado.nombre_estado,
+      },
+    });
+  } catch (error) {
+    console.error("Error al simular pago:", error);
+    res.status(500).json({
+      message: "Error al simular pago",
+      error: error.message,
+    });
   }
 };
 
