@@ -4,7 +4,7 @@ import { sendEmail } from "./sendgrid.controller.js";
 
 // Configurar Mercado Pago
 const client = new MercadoPagoConfig({
-  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
+  accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN?.trim(),
 });
 
 /**
@@ -139,7 +139,7 @@ export const crearPreferenciaPago = async (req, res) => {
 
     // Crear preferencia de Mercado Pago
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    
+
     const preferenceData = {
       items: [
         {
@@ -159,21 +159,26 @@ export const crearPreferenciaPago = async (req, res) => {
         pending: `${frontendUrl}/mis-pedidos/${pedido.id_pedido}?payment=pending`,
       },
       external_reference: `pedido_${pedido.id_pedido}`,
-      notification_url: `${process.env.BACKEND_URL || "http://localhost:3000"}/api/pagos/webhook`,
+      notification_url: `${
+        process.env.BACKEND_URL || "http://localhost:3000"
+      }/api/pagos/webhook`,
     };
 
     // Crear preferencia
     const preference = new Preference(client);
     const response = await preference.create({ body: preferenceData });
 
-
     const initPoint = response?.init_point || response?.body?.init_point;
     const preferenciaId = response?.id || response?.body?.id;
 
     if (!initPoint) {
-      console.error("No se pudo obtener init_point de Mercado Pago. Respuesta:", response);
+      console.error(
+        "No se pudo obtener init_point de Mercado Pago. Respuesta:",
+        response
+      );
       return res.status(500).json({
-        message: "Error al crear preferencia de pago: no se obtuvo URL de checkout",
+        message:
+          "Error al crear preferencia de pago: no se obtuvo URL de checkout",
       });
     }
 
@@ -233,7 +238,9 @@ export const crearPreferenciaPago = async (req, res) => {
             console.error("Error al enviar email de confirmación:", emailError);
           }
 
-          console.log(`Pago confirmado automáticamente para pedido #${pedidoId}`);
+          console.log(
+            `Pago confirmado automáticamente para pedido #${pedidoId}`
+          );
         }
       } catch (error) {
         console.error(
@@ -255,7 +262,7 @@ export const crearPreferenciaPago = async (req, res) => {
       response: error.response?.data,
       status: error.response?.status,
     });
-    res.status(500).json({ 
+    res.status(500).json({
       message: "Error al crear preferencia de pago",
       error: error.message,
     });
@@ -442,7 +449,8 @@ export const confirmarPago = async (req, res) => {
 
       res.json({
         status: "success",
-        message: "Pago registrado como fallido. El pedido permanece en 'No pagado'",
+        message:
+          "Pago registrado como fallido. El pedido permanece en 'No pagado'",
       });
     } else {
       return res.status(400).json({
@@ -619,7 +627,9 @@ export const simularPago = async (req, res) => {
           <p><strong>Detalles del pedido:</strong></p>
           <ul>
             <li>Pedido: #${id_pedido}</li>
-            <li>Monto: $${pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"}</li>
+            <li>Monto: $${
+              pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"
+            }</li>
             <li>Destino: ${pedidoActualizado.direccion_destino}</li>
             <li>Transacción: ${idTransaccionSimulada}</li>
           </ul>
@@ -677,7 +687,9 @@ export const procesarWebhookMercadoPago = async (req, res) => {
     // Extraer ID del pedido de external_reference
     const externalReference = payment.external_reference; // "pedido_123"
     if (!externalReference || !externalReference.startsWith("pedido_")) {
-      return res.status(200).json({ message: "Referencia de pedido no válida" });
+      return res
+        .status(200)
+        .json({ message: "Referencia de pedido no válida" });
     }
 
     const id_pedido = parseInt(externalReference.split("_")[1]);
@@ -739,7 +751,9 @@ export const procesarWebhookMercadoPago = async (req, res) => {
             <p><strong>Detalles del pedido:</strong></p>
             <ul>
               <li>Pedido: #${id_pedido}</li>
-              <li>Monto: $${pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"}</li>
+              <li>Monto: $${
+                pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"
+              }</li>
               <li>Destino: ${pedidoActualizado.direccion_destino}</li>
               <li>Transacción: ${payment.id}</li>
             </ul>
@@ -760,10 +774,14 @@ export const procesarWebhookMercadoPago = async (req, res) => {
             html: `
               <h2>Pago recibido</h2>
               <p>Hola ${pedido.vendedor.nombre},</p>
-              <p>El cliente ${pedido.cliente.nombre} acaba de pagar el pedido #${id_pedido}.</p>
+              <p>El cliente ${
+                pedido.cliente.nombre
+              } acaba de pagar el pedido #${id_pedido}.</p>
               <p><strong>Detalles:</strong></p>
               <ul>
-                <li>Monto: $${pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"}</li>
+                <li>Monto: $${
+                  pedidoActualizado.monto_pedido?.toFixed(2) || "N/A"
+                }</li>
                 <li>Cliente: ${pedido.cliente.nombre}</li>
                 <li>Destino: ${pedidoActualizado.direccion_destino}</li>
               </ul>
