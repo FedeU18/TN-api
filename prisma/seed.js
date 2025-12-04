@@ -3,25 +3,68 @@ import bcrypt from "bcrypt";
 
 const prisma = new PrismaClient();
 
+// --- Generador de descripción de pedidos ---
+const productos = [
+  "hamburguesa simple",
+  "hamburguesa doble",
+  "pizza muzzarella",
+  "pizza napolitana",
+  "tacos de carne",
+  "tacos de pollo",
+  "ensalada cesar",
+  "sushi roll",
+  "empanada de carne",
+  "empanada de jamón y queso",
+  "sandwich de milanesa",
+  "lomito completo",
+];
+
+const bebidas = [
+  "Coca-Cola",
+  "Sprite",
+  "Fanta",
+  "agua mineral",
+  "jugo natural",
+  "cerveza artesanal",
+  "agua saborizada",
+];
+
+function generarDescripcion() {
+  const cant = Math.floor(Math.random() * 3) + 1;
+  const items = [];
+
+  for (let i = 0; i < cant; i++) {
+    const cantidad = Math.floor(Math.random() * 3) + 1;
+    const producto = productos[Math.floor(Math.random() * productos.length)];
+    items.push(`${cantidad} ${producto}${cantidad > 1 ? "s" : ""}`);
+  }
+
+  if (Math.random() > 0.5) {
+    const bebida = bebidas[Math.floor(Math.random() * bebidas.length)];
+    const cantidadBebidas = Math.floor(Math.random() * 2) + 1;
+    items.push(`${cantidadBebidas} ${bebida}`);
+  }
+
+  return items.join(" + ");
+}
+
 async function main() {
   console.log("🌱 Iniciando seed extendido...");
 
-  // 🔹 Borrar primero tablas dependientes
+  // 🔹 Limpiar tablas dependientes primero
   await prisma.ubicacion.deleteMany({});
   await prisma.notificacion.deleteMany({});
   await prisma.calificacion.deleteMany({});
-
-  // 🔹 Luego tablas independientes
   await prisma.pedido.deleteMany({});
   await prisma.estadoPedido.deleteMany({});
   await prisma.tipoUbicacion.deleteMany({});
   await prisma.tipoNotificacion.deleteMany({});
   await prisma.usuario.deleteMany({});
 
+  // === Usuarios ===
   const hashedPassword = await bcrypt.hash("password!123", 10);
   const hashedAdminPassword = await bcrypt.hash("admin!123", 10);
 
-  // === Usuarios ===
   await prisma.usuario.createMany({
     data: [
       {
@@ -162,6 +205,7 @@ async function main() {
 
   const ahora = new Date();
 
+  // === Pedidos base ===
   const pedidosData = [
     {
       id_cliente: clientesDB[0].id_usuario,
@@ -175,12 +219,13 @@ async function main() {
       id_estado: asignado.id_estado,
       qr_codigo: "QR001",
       fecha_creacion: new Date(ahora.getTime() - 1000 * 60 * 60 * 4),
+      descripcion: generarDescripcion(),
     },
     {
       id_cliente: clientesDB[0].id_usuario,
       id_repartidor: null,
-      direccion_origen: "Yrigoyen 379, Cipolletti, Río Negro",
-      direccion_destino: "Venezuela 1140, Cipolletti, Río Negro",
+      direccion_origen: "Yrigoyen 379, Cipolletti",
+      direccion_destino: "Venezuela 1140, Cipolletti",
       origen_latitud: -38.9387117,
       origen_longitud: -67.9904295,
       destino_latitud: -38.9395124,
@@ -188,11 +233,11 @@ async function main() {
       id_estado: pendiente.id_estado,
       qr_codigo: "QR056",
       fecha_creacion: ahora,
+      descripcion: generarDescripcion(),
     },
-    // ... resto de QR057–QR015 igual …
   ];
 
-  // === Pedidos adicionales ===
+  // === 40 pedidos dinámicos ===
   const nuevosPedidos = Array.from({ length: 40 }).map((_, i) => {
     const qr = `QR${String(i + 16).padStart(3, "0")}`;
     const cliente = clientesDB[i % clientesDB.length];
@@ -203,6 +248,7 @@ async function main() {
 
     const baseLat = -38.95 - Math.random() * 0.01;
     const baseLng = -68.06 - Math.random() * 0.01;
+
     const fechaCreacion = new Date(
       Date.now() - 1000 * 60 * 60 * (Math.random() * 24 * 90)
     );
@@ -226,14 +272,14 @@ async function main() {
       id_estado: estado.id_estado,
       qr_codigo: qr,
       fecha_creacion: fechaCreacion,
+      descripcion: generarDescripcion(),
       ...(tieneEntrega ? { fecha_entrega: fechaEntrega } : {}),
     };
   });
 
-  // Mezclar todo
   pedidosData.push(...nuevosPedidos);
 
-  // === Agregar estado_pago evitando reasignar pedidosData ===
+  // Agregar estado_pago
   const pedidosConPago = pedidosData.map((p) => ({
     ...p,
     estado_pago: p.id_estado === noPagado.id_estado ? "pendiente" : "pagado",
@@ -259,6 +305,7 @@ async function main() {
     ],
   });
 
+  // === Calificaciones ===
   const pedidosEntregados = await prisma.pedido.findMany({
     where: {
       estado: { nombre_estado: "Entregado" },

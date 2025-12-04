@@ -20,6 +20,7 @@ export const crearPedidoVendedor = async (req, res) => {
       destino_latitud,
       destino_longitud,
       monto_pedido,
+      descripcion, // 👉 AGREGADO
     } = req.body;
 
     // Validación mínima
@@ -36,14 +37,14 @@ export const crearPedidoVendedor = async (req, res) => {
       return res.status(404).json({ message: "El cliente no existe." });
     }
 
-    // Verificar que exista el estado inicial del pedido (ej: 'No pagado')
+    // Verificar estado inicial
     const estadoInicial = await prisma.estadoPedido.findFirst({
       where: { nombre_estado: "No pagado" },
     });
 
     if (!estadoInicial) {
       return res.status(500).json({
-         message: "No existe un estado inicial 'No pagado' en la base de datos.",
+        message: "No existe un estado inicial 'No pagado' en la base de datos.",
       });
     }
 
@@ -61,6 +62,7 @@ export const crearPedidoVendedor = async (req, res) => {
         destino_longitud: destino_longitud || null,
         monto_pedido: monto_pedido ? parseFloat(monto_pedido) : null,
         estado_pago: "pendiente",
+        descripcion: descripcion || null, // 👉 AGREGADO
       },
     });
 
@@ -85,7 +87,6 @@ export const getMisPedidosVendedor = async (req, res) => {
         .json({ message: "No tenés permisos para ver estos pedidos." });
     }
 
-    // Obtener todos los pedidos creados por este vendedor
     const pedidos = await prisma.pedido.findMany({
       where: {
         id_vendedor: usuarioId,
@@ -143,7 +144,6 @@ export const getDetallePedidoVendedor = async (req, res) => {
         .json({ message: "No tienes permisos para ver este pedido." });
     }
 
-    // Obtener el pedido y verificar que pertenezca al vendedor
     const pedido = await prisma.pedido.findUnique({
       where: {
         id_pedido: parseInt(id_pedido),
@@ -192,7 +192,6 @@ export const getDetallePedidoVendedor = async (req, res) => {
       return res.status(404).json({ message: "Pedido no encontrado." });
     }
 
-    // Verificar que el pedido pertenezca al vendedor
     if (pedido.id_vendedor !== usuarioId) {
       return res.status(403).json({
         message: "No tienes permiso para ver los detalles de este pedido.",

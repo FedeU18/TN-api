@@ -65,7 +65,7 @@ model Pedido {
   fecha_entrega  DateTime?
   qr_codigo      String?
   qr_token       String?
-  
+  descripcion     String?
   // Campos de pago
   monto_pedido         Decimal?      @db.Decimal(10,2)
   id_transaccion_pago  String?
